@@ -51,7 +51,10 @@ jobs:
         run: |
           go build -o gh-residue-smoke ./cmd/gh-residue
           ./gh-residue-smoke --version
-          ./gh-residue-smoke verify not-a-repo --input /dev/null; test $? -eq 2
+          # A usage error must exit 2. The shell runs with -e, so capture the code explicitly.
+          code=0
+          ./gh-residue-smoke verify not-a-repo --input smoke-input || code=$?
+          test "$code" -eq 2
 
   vulncheck:
     name: govulncheck
