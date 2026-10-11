@@ -5,6 +5,11 @@
   <img alt="A commit graph: the rewritten main branch is a solid line. An old commit hangs off it as a dashed ghost, still reachable through refs/pull/1/merge. A second ghost commit has no ref and resolves only by its SHA." src="docs/assets/banner-light.png" width="100%">
 </picture>
 
+[![ci](https://github.com/0x524a/gh-residue/actions/workflows/ci.yml/badge.svg)](https://github.com/0x524a/gh-residue/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/0x524a/gh-residue)](https://github.com/0x524a/gh-residue/releases/latest)
+[![license](https://img.shields.io/github/license/0x524a/gh-residue)](LICENSE)
+[![go version](https://img.shields.io/github/go-mod/go-version/0x524a/gh-residue)](go.mod)
+
 Rewriting history and force-pushing does not remove the old commits from GitHub. They can stay reachable by SHA, through pull request refs, and from forks. `gh-residue` checks each old commit, shows where it is still reachable, and drafts the request to send GitHub Support.
 
 > **Rotate the leaked credential first.** This tool only checks. It cannot remove anything; only GitHub Support can purge cached views and pull request refs.
@@ -111,7 +116,7 @@ Reports, checkpoints and drafts list the SHAs of a leak. Do not commit them to a
 
 - Local clones, CI caches and third-party mirrors are out of reach. Public repositories' push events may also sit in archives such as GH Archive; whether force-pushed SHAs reach them is untested.
 - The cached web view of a commit is not probed yet.
-- The Windows build exists but is untested.
+- CI runs the tests and a release-style build on Linux, macOS and Windows. One Windows gap remains: passing a token to git for the mirror clone goes through a `sh` helper that CI cannot exercise, because it needs an authenticated remote. On Windows, file permissions are not enforced either, so checkpoint and draft files are not restricted to your user.
 - 11 claims are still unverified and tagged **(unverified)** in [`docs/10-open-questions.md`](docs/10-open-questions.md).
 
 ## Design

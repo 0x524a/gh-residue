@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## State of the repo
 
-M1 (single-repo CLI) is implemented in Go (stdlib only, `go 1.22`). M0 was accepted with fact 3 (shared fork object store) deferred. M2 is done (golden files for table, JSON, Support draft and diff live in `internal/report/testdata/`; HTTP fixtures are still inline `httptest` servers): Support draft (`report/support.go`), diff mode (`report/diff.go`), checkpoint/resume (`probe/known.go`, `app.merge`, `cmd` `loadCheckpoint`). Not built yet: org mode (M4), web-view probe 5, ref-holding fork probe.
+M1 (single-repo CLI) is implemented in Go (stdlib only, `go 1.23`; the floor is 1.23 because a cgo-linked Go 1.22 binary aborts on macOS 26 with `missing LC_UUID`, found in CI). M0 was accepted with fact 3 (shared fork object store) deferred. M2 is done (golden files for table, JSON, Support draft and diff live in `internal/report/testdata/`; HTTP fixtures are still inline `httptest` servers): Support draft (`report/support.go`), diff mode (`report/diff.go`), checkpoint/resume (`probe/known.go`, `app.merge`, `cmd` `loadCheckpoint`). Not built yet: org mode (M4), web-view probe 5, ref-holding fork probe.
 
 Packaging (M3): remote `0x524a/gh-residue` (public, Apache-2.0). Commit as `0x524a` using the repo-local identity (GitHub noreply email), never the global git identity. Release by bumping `baseVersion` in `cmd/gh-residue/main.go` and pushing a matching `v*` tag; tags containing `-` are prereleases. `dist/` must stay in `.gitignore` or builds report `-dirty`.
 

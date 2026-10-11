@@ -14,6 +14,8 @@ Nothing in M1 or later starts before M0.
 
 ## Status log
 
+- 2026-10-11: CI extended: lint, tests on Linux/macOS/Windows, govulncheck, and a release-style (cgo off) build-and-run smoke test per OS. It found three real problems: golden files checked out with CRLF on Windows (fixed with `.gitattributes`), a test asserting Unix file modes on Windows, and Go 1.22 test binaries aborting on macOS 26 (`missing LC_UUID`; cgo-on only, Go 1.23+ fine, shipped cgo-off binaries unaffected). `go.mod` floor raised to 1.23. README badges added.
+
 - 2026-10-11: README redesigned around a commit-graph banner drawn from the Gate 0 findings (light, dark and stacked mobile variants, checked on github.com at 390px and 1280px). Sample output in the README is real output, trimmed, with the repository name replaced. The Developer Program page was re-read: no logos until registration.
 
 - 2026-10-11: build-provenance attestations enabled (verified on `rc.3`: SLSA provenance v1, subject digest matches the downloaded binary); stable `v0.1.0` released. M3 is done except exercising `gh extension install` on a clean machine and Windows verification.
