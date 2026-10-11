@@ -17,6 +17,7 @@ jobs:
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
+          cache: false # no dependencies, so no go.sum to key a cache on
       # Gate the release on the same checks as CI.
       - run: go vet ./... && go test ./...
       - uses: cli/gh-extension-precompile@76961aa3bd1123d0a6fd42d0a41aca0696937c39 # v2.2.0
