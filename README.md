@@ -1,6 +1,6 @@
 # gh-residue
 
-> **Status: pre-release (`v0.1.0-rc.2`).** The verify command, Support-request draft, diff mode and checkpoint/resume work and are tested. Several claims are still unverified and tagged as such; see below.
+> **Status: pre-release (`v0.1.0-rc.3`).** The verify command, Support-request draft, diff mode and checkpoint/resume work and are tested. Several claims are still unverified and tagged as such; see below.
 
 ## Where this stands
 
@@ -17,7 +17,7 @@ A read-only `gh` extension that answers one question after you rewrite git histo
 ## Install and use
 
 ```bash
-gh extension install 0x524a/gh-residue --pin v0.1.0-rc.2   # prereleases must be pinned (there is no stable release yet)
+gh extension install 0x524a/gh-residue --pin v0.1.0-rc.3   # prereleases must be pinned (there is no stable release yet)
 gh residue --version
 ```
 
