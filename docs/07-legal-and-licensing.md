@@ -4,7 +4,7 @@ Not legal advice. A design-stage checklist.
 
 ## License
 
-Proposed: Apache-2.0 (patent grant). Confirm it matches the owner's other projects.
+**Apache-2.0** (patent grant), chosen by the owner on 2026-10-11 when the repository was made public. The `LICENSE` file is GitHub's standard text, unmodified.
 
 ## Trademark and naming
 

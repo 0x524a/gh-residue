@@ -1,15 +1,14 @@
 # gh-residue
 
-> **Status: M1 (single-repo CLI) implemented 2026-10-10; M2 (Support draft, diff, resume) not started.** Everything here is a proposal; the gating spike in [`docs/08-testing-strategy.md`](docs/08-testing-strategy.md) is two-thirds done.
+> **Status: pre-release (`v0.1.0-rc.2`).** The verify command, Support-request draft, diff mode and checkpoint/resume work and are tested. Several claims are still unverified and tagged as such; see below.
 
-## Where this stands (2026-10-10)
+## Where this stands
 
-- Spec complete and consistency-reviewed: docs 01 to 10, ADRs 0001 to 0005.
-- Gate 0 spike: facts 1 and 2 confirmed, public-repo run done ([`docs/spike/gate0-results.md`](docs/spike/gate0-results.md)). Fact 3 (shared fork object store) untested: no second account.
-- Doc-only questions 1 to 3 closed against GitHub's official docs; 13 questions remain open ([`docs/10-open-questions.md`](docs/10-open-questions.md)).
-- **Decision pending (owner):** accept M0 with fact 3 deferred, or close it first via a GitHub machine account (allowed by the ToS). Proposed: accept and defer ([`docs/09-roadmap.md`](docs/09-roadmap.md)).
-- **M0 decision:** accepted with fact 3 deferred; M1 built. Next: M2.
-- **Loose end:** the private throwaway repo `0x524a/residue-spike-1791666833` still exists (kept for question 13, merge-ref lifetime). Remove with `gh repo delete 0x524a/residue-spike-1791666833 --yes`.
+- Works: base-repo, PR-ref, branch, tag and sampled-fork probes; table and JSON output; exit codes; `--support-draft`; `--against`; `--checkpoint`.
+- **Fork results mean "object resolvable", not "fork holds a ref".** Whether forks share one object store is untested (it needs a second account), and ref-holding forks are not probed yet, so the Support draft's *Ready for Support?* line can say `no` or `unknown` but never `yes`.
+- Not built yet: the web-view probe, org mode, artifact attestations on releases.
+- The Windows build exists but is untested; the mirror probe passes the token through a `sh` helper.
+- Design and evidence: [`docs/`](docs/), the gating experiment in [`docs/spike/gate0-results.md`](docs/spike/gate0-results.md), and 11 open questions in [`docs/10-open-questions.md`](docs/10-open-questions.md).
 
 A read-only `gh` extension that answers one question after you rewrite git history to remove a leaked secret:
 
@@ -18,8 +17,7 @@ A read-only `gh` extension that answers one question after you rewrite git histo
 ## Install and use
 
 ```bash
-gh extension install 0x524a/gh-residue            # latest stable release
-gh extension install 0x524a/gh-residue --pin v0.1.0-rc.2   # a prerelease must be pinned
+gh extension install 0x524a/gh-residue --pin v0.1.0-rc.2   # prereleases must be pinned (there is no stable release yet)
 gh residue --version
 ```
 
@@ -74,3 +72,7 @@ Existing popular tools are on the finding side (for example `trufflesecurity/for
 ## Conventions
 
 Claims not yet confirmed against official docs or an experiment are tagged **(unverified)**. They are collected in `docs/10-open-questions.md`.
+
+## License
+
+[Apache-2.0](LICENSE).

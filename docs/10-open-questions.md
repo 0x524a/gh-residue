@@ -10,7 +10,6 @@ Last updated 2026-10-10. Closed items are kept (struck through) so the trail is 
 | 7a | Whether specific force-pushes actually appear in GH Archive with the `before` SHA | doc 03 | Query a known public force-push in GH Archive or BigQuery |
 | 8 | Events API retention window for `PushEvent` (docs say a timeline of up to 300 events; the time window wasn't in the fetched text) | doc 05 | GitHub Events docs; public-repo spike run |
 | 9 | Commercial products already covering post-rewrite verification | doc 01 | Survey beyond GitHub repo search |
-| 10 | License choice matches the owner's other projects | doc 07 | Owner decision |
 | 11 | Default fork cap (200) is reasonable (concurrency is now 1 per GitHub's best-practices page) | doc 05 | Tune after M1 |
 | 12 | Formal trademark clearance for the name | doc 07 | Separate legal step, if desired |
 | 13 | How long `refs/pull/N/merge` keeps the old commit after a PR-branch force-push (seen about 1 minute) | doc 03 | Re-probe the spike repo over time; GitHub docs |
@@ -20,6 +19,8 @@ Last updated 2026-10-10. Closed items are kept (struck through) so the trail is 
 | 17 | Whether a `git-filter-repo` `commit-map` reliably yields the same "First Changed Commit(s)" value filter-repo prints | doc 04 | Compare on a test rewrite |
 
 ## Closed
+
+_Item 10 (licence) closed 2026-10-11: owner chose Apache-2.0._
 
 | # | Question | Resolution |
 |---|---|---|
