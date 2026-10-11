@@ -19,7 +19,7 @@ A read-only `gh` extension that answers one question after you rewrite git histo
 
 ```bash
 gh extension install 0x524a/gh-residue            # latest stable release
-gh extension install 0x524a/gh-residue --pin v0.1.0-rc.1   # a prerelease must be pinned
+gh extension install 0x524a/gh-residue --pin v0.1.0-rc.2   # a prerelease must be pinned
 gh residue --version
 ```
 
