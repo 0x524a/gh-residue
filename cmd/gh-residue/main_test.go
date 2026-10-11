@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -58,8 +59,13 @@ func TestCheckpointRoundTripAndMode(t *testing.T) {
 		{OldSHA: "b", Status: model.Unknown}, // unknown results are ignored by the age check
 	}}
 	writeRun(t, p, r)
-	if st, err := os.Stat(p); err != nil || st.Mode().Perm() != 0o600 {
-		t.Fatalf("mode %v err %v", st.Mode(), err)
+	st, err := os.Stat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Windows has no Unix permission bits; the 0600 guarantee only holds elsewhere.
+	if runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 {
+		t.Fatalf("mode %v", st.Mode())
 	}
 	if left, _ := filepath.Glob(filepath.Join(filepath.Dir(p), ".gh-residue-checkpoint-*")); len(left) != 0 {
 		t.Errorf("temp file left behind: %v", left)

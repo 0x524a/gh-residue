@@ -42,6 +42,16 @@ jobs:
           cache: false
       # No network and no token needed; the mirror tests use real git on local bare repos.
       - run: go test ./...
+      # Build the way the release does (cgo off) and run the result, so a binary that
+      # builds but will not launch on this OS fails here, not in a user's terminal.
+      - name: build and run (release-style)
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          go build -o gh-residue-smoke ./cmd/gh-residue
+          ./gh-residue-smoke --version
+          ./gh-residue-smoke verify not-a-repo --input /dev/null; test $? -eq 2
 
   vulncheck:
     name: govulncheck

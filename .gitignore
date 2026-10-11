@@ -8,3 +8,4 @@ checkpoint*.json
 support-draft*.md
 /dist/
 .playwright-mcp/
+/gh-residue-smoke*
