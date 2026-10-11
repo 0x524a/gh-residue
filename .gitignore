@@ -7,3 +7,4 @@ checkpoint*.json
 *.checkpoint.json
 support-draft*.md
 /dist/
+.playwright-mcp/

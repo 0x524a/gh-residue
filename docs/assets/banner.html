@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>gh-residue banner</title>
+<!--
+  Source for the README banner. Rendered to banner-light.png and banner-dark.png with
+  Playwright: open this file at 1280x460, emulate prefers-color-scheme light/dark, and
+  screenshot the #banner element at device scale. Fonts load from Google Fonts for the render
+  only; the README embeds the PNGs, so readers never fetch them.
+  No GitHub or Octocat logo appears here: the logos are reserved for GitHub Developer Program
+  members (docs.github.com/en/integrations/concepts/github-developer-program).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EEF0F6;
+    --ink: #1A1833;
+    --graphite: #6B6985;
+    --uv: #5B2EE6;
+    --ghost-fill: rgba(91, 46, 230, .10);
+    --glow: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14122B;
+      --ink: #ECEBF5;
+      --graphite: #9A98B8;
+      --uv: #9B7BFF;
+      --ghost-fill: rgba(155, 123, 255, .20);
+      --glow: drop-shadow(0 0 9px rgba(155, 123, 255, .85));
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--paper); }
+  #banner { width: 1280px; height: 460px; position: relative; background: var(--paper); overflow: hidden; }
+  .copy { position: absolute; left: 72px; top: 118px; width: 520px; color: var(--ink); }
+  h1 { font: 700 104px/0.95 "Bricolage Grotesque", system-ui, sans-serif; letter-spacing: -0.035em; font-variation-settings: "opsz" 96; }
+  p { margin-top: 30px; font: 500 31px/1.28 "Bricolage Grotesque", system-ui, sans-serif; letter-spacing: -0.01em; color: var(--ink); opacity: .86; }
+  svg { position: absolute; left: 0; top: 0; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 500; }
+  .edge { stroke: var(--ink); stroke-width: 4; fill: none; stroke-linecap: round; }
+  .node { fill: var(--ink); }
+  .ghost-edge { stroke: var(--uv); stroke-width: 4; fill: none; stroke-dasharray: 3 11; stroke-linecap: round; }
+  .ghost { fill: var(--ghost-fill); stroke: var(--uv); stroke-width: 4; stroke-dasharray: 6 6; filter: var(--glow); }
+  .ghost-solid { fill: var(--ghost-fill); stroke: var(--uv); stroke-width: 4; filter: var(--glow); }
+  .ref { fill: var(--paper); stroke: var(--uv); stroke-width: 4; filter: var(--glow); }
+  .t-ink { fill: var(--ink); font-size: 22px; }
+  .t-uv { fill: var(--uv); font-size: 22px; font-weight: 700; }
+  .t-dim { fill: var(--graphite); font-size: 20px; }
+</style>
+</head>
+<body>
+<div id="banner">
+  <div class="copy">
+    <h1>gh-residue</h1>
+    <p>After a force-push, see which old commits GitHub still serves.</p>
+  </div>
+
+  <svg width="1280" height="460" viewBox="0 0 1280 460" role="img"
+       aria-label="A commit graph. The rewritten main branch is a solid line of commits. An old commit hangs off the fork point as a dashed ghost, still reachable through refs/pull/1/merge. A second ghost commit has no ref at all and resolves only by its SHA.">
+    <g transform="translate(-70 0)">
+    <!-- rewritten main -->
+    <path class="edge" d="M 660 100 H 1180"/>
+    <g class="node">
+      <circle cx="660" cy="100" r="12"/><circle cx="780" cy="100" r="12"/><circle cx="900" cy="100" r="12"/>
+      <circle cx="1020" cy="100" r="12"/><circle cx="1140" cy="100" r="12"/>
+    </g>
+    <text class="mono t-ink" x="660" y="58">main</text>
+    <text class="mono t-dim" x="725" y="58">history rewritten</text>
+
+    <!-- ghost branch: old commit kept alive by a PR merge ref -->
+    <path class="ghost-edge" d="M 780 100 C 800 190, 830 214, 880 214"/>
+    <path class="ghost-edge" d="M 912 214 H 1040"/>
+    <circle class="ghost" cx="896" cy="214" r="17"/>
+    <rect class="ref" x="1050" y="196" width="40" height="36" rx="8"/>
+    <text class="mono t-uv" x="826" y="268">a8fe590</text>
+    <text class="mono t-dim" x="826" y="296">old commit, still reachable</text>
+    <text class="mono t-uv" x="1070" y="176" text-anchor="middle">refs/pull/1/merge</text>
+
+    <!-- detached ghost: no ref, resolves by SHA only -->
+    <circle class="ghost" cx="1000" cy="372" r="17"/>
+    <text class="mono t-uv" x="1034" y="366">78b6c2e</text>
+    <text class="mono t-dim" x="1034" y="396">no ref, resolves by SHA</text>
+    </g>
+  </svg>
+</div>
+</body>
+</html>
