@@ -14,6 +14,8 @@ Nothing in M1 or later starts before M0.
 
 ## Status log
 
+- 2026-10-11 (M3 mostly done): private repo `0x524a/gh-residue`; CI (gofmt, vet, test) and a tag-triggered release using `cli/gh-extension-precompile` (pinned by SHA) produce a prerelease `v0.1.0-rc.2` with 12 platform binaries. Fork probing is now serial by default (`--concurrency`), per GitHub's best-practices page. Not done: `gh extension install` itself not exercised on a machine, artifact attestations (need permissions and, for private repos, a supporting plan), making the repo public, a licence (open question 10), Developer Program registration (needs a support email the owner has not chosen). Windows: the mirror probe's `GIT_ASKPASS` helper is a `sh` script; unverified on Windows.
+
 - 2026-10-11 (M2 exit criteria met): golden tests added for table, JSON, Support draft (full and minimal) and diff (changed and unchanged), regenerated with `-update` and reviewed by hand. They immediately caught a pluralisation bug ("1 results"). Contract tests for exit codes 0, 1 and 2 exist in `internal/model`. Recorded-HTTP fixture files are not used: probe tests build `httptest` servers inline instead.
 
 - 2026-10-11 (M2 complete): checkpoint/resume implemented (`--checkpoint FILE`). The checkpoint is the `--json` Run; a resume carries over only `confirmed` and `not_found` results (original `checked_at` kept) and re-runs the rest. Refused for a different repo or when the oldest carried result is older than `--checkpoint-max-age` (default 24h; an unparseable timestamp counts as stale). Limitation: the file is written when a run ends, including Ctrl-C and rate-limit exhaustion, but not mid-run, so a hard kill loses that run's progress. M2 exit criteria still need golden-file tests.
