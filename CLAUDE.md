@@ -14,7 +14,7 @@ go test ./...                                   # no network; mirror tests use r
 go test ./internal/probe -run TestMirrorProbe   # single test
 go test ./internal/report -update               # regenerate golden files; then READ the diff before keeping it
 go vet ./... && gofmt -l .
-./gh-residue verify OWNER/REPO --input <filter-repo dir | sha-list file> [--json] [--max-forks N] [--no-forks] [--no-mirror] [--yes]
+./gh-residue verify OWNER/REPO --input <filter-repo dir | sha-list file> [--json] [--max-forks N] [--concurrency N] [--no-forks] [--no-mirror] [--yes]
          [--support-draft FILE] [--first-changed SHA,...] [--lfs-file NAME] [--against PREV.json]
          [--checkpoint FILE] [--checkpoint-max-age 24h]
 ```

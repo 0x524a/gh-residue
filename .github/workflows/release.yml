@@ -24,4 +24,5 @@ jobs:
         with:
           go_version_file: go.mod
           go_build_options: ./cmd/gh-residue
-          generate_attestations: true
+          # generate_attestations needs id-token/attestations permissions and, on private
+          # repos, a plan that supports artifact attestations. Revisit once the repo is public.

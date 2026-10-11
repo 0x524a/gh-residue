@@ -7,6 +7,14 @@
 - No GitHub App in v1 (hosting and install flow for little gain).
 - The token is never logged, never written to JSON, never passed on a command line. Git uses a credential helper or `GIT_ASKPASS`.
 
+## API version
+
+Requests pin `X-GitHub-Api-Version: 2022-11-28`, supported until 2028-03-10 (docs fetched 2026-10-11; latest is 2026-03-10). Checked live on 2026-10-11: the commits endpoint returns identical 200 and 422 for both versions. Re-verify the 422 "No commit found" behaviour before moving versions, since ADR-0002 depends on it.
+
+## Why not `GET /git/commits/{sha}`
+
+It returns about half the payload (no file patches) but answers **404** for an absent SHA, which a hidden repo also returns, so it can never support a safe `not_found`. `GET /repos/{r}/commits/{sha}` returns a distinct 422 and stays.
+
 ## Rate limits
 
 Confirmed against docs.github.com "Rate limits for the REST API" (fetched 2026-10-10):
@@ -16,11 +24,11 @@ Confirmed against docs.github.com "Rate limits for the REST API" (fetched 2026-1
 - Secondary limits (can change without notice, and can trigger for undisclosed reasons): at most 100 concurrent requests (shared REST and GraphQL); 900 points/minute per REST endpoint, 2,000 points/minute for GraphQL; 90 seconds of CPU time per 60 seconds of real time (60 s of that for GraphQL).
 - On 403/429: if `retry-after` is present wait that long; if `x-ratelimit-remaining` is 0 wait until `x-ratelimit-reset`; otherwise wait at least one minute, then back off exponentially and give up after a bounded number of retries. `GET /rate_limit` doesn't count against the primary limit.
 
-Design consequence: default concurrency 4 is well under the 100 cap; keep it low because CPU-time limits are not observable.
+Design consequence: GitHub's best-practices page (fetched 2026-10-11) says to make requests **serially** to avoid secondary limits, so default concurrency is **1** (`--concurrency N` to opt in). CPU-time limits are not observable, so higher values are the user's risk. Rate-limit handling follows the same page: `retry-after`, then `x-ratelimit-reset`; a plain 403/429 with neither header is reported `unknown` rather than retried after a minute (stricter than the page, never a false clear).
 
 - Up-front estimate: SHAs x (1 base + N forks), printed before starting; above a threshold require `--yes`.
 - Fork probing is the expensive part: capped (default 200) and prioritized by recent push and stars.
-- Honor `Retry-After` and `X-RateLimit-Reset`. Default concurrency 4. Use `ETag` conditional requests on re-runs where supported.
+- Honor `Retry-After` and `X-RateLimit-Reset`. Default concurrency 1. Use `ETag` conditional requests on re-runs where supported.
 - Budget exhausted mid-run: remaining checks become `unknown`, exit code 2.
 - A resumable checkpoint file lets a rate-limited run continue (`--checkpoint FILE`, implemented). It is the JSON Run. Resuming carries over only `confirmed` and `not_found`, never `unknown`, and refuses results older than `--checkpoint-max-age`, because an old `not_found` must not pass as current. Written at the end of a run, not incrementally.
 

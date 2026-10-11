@@ -28,4 +28,4 @@ Fork owners' usernames are other people's data: local output only, omitted from 
 
 ## Developer Program
 
-Eligibility is an integration using the GitHub API plus a public support email. This tool qualifies once it exists. Registration is optional and carries no legal bearing on the licence.
+Re-read 2026-10-11: membership is open to individuals and companies with (1) an integration in production or development using the GitHub API and (2) an email address where GitHub users can contact them for support. The documented benefits are permission to use the Octocat or GitHub logo to show the product works with GitHub, and promoting the integration with a video or blog post. Eligibility is an integration using the GitHub API plus a public support email. Registration needs a support email address, which is the owner's call (not decided); until then no GitHub or Octocat logo is used anywhere. This tool qualifies once it exists. Registration is optional and carries no legal bearing on the licence.

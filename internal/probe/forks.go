@@ -18,7 +18,7 @@ import (
 type Forks struct {
 	Client       *ghapi.Client
 	Cap          int // forks to probe; 0 means 200
-	Concurrency  int // 0 means 4
+	Concurrency  int // 0 means 1: GitHub advises serial requests (secondary rate limits)
 	MaxListPages int // pages of 100 to list before prioritising; 0 means 10
 	Known        *Known
 }
@@ -39,7 +39,7 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 		capN = 200
 	}
 	if conc <= 0 {
-		conc = 4
+		conc = 1
 	}
 	if maxPages <= 0 {
 		maxPages = 10

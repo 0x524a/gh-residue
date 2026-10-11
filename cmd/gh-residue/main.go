@@ -68,7 +68,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	if len(args) == 0 || args[0] != "verify" {
-		fmt.Fprintln(stderr, "usage: gh-residue [--version] verify OWNER/REPO --input PATH [--json] [--max-forks N] [--no-forks] [--no-mirror] [--yes]\n       [--support-draft FILE] [--first-changed SHA,...] [--lfs-file NAME] [--against PREV.json]\n       [--checkpoint FILE] [--checkpoint-max-age 24h]")
+		fmt.Fprintln(stderr, "usage: gh-residue [--version] verify OWNER/REPO --input PATH [--json] [--max-forks N] [--concurrency N] [--no-forks] [--no-mirror] [--yes]\n       [--support-draft FILE] [--first-changed SHA,...] [--lfs-file NAME] [--against PREV.json]\n       [--checkpoint FILE] [--checkpoint-max-age 24h]")
 		return 2
 	}
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
@@ -76,6 +76,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	inPath := fs.String("input", "", "filter-repo working dir, or file with one full 40-char SHA per line")
 	asJSON := fs.Bool("json", false, "print JSON instead of the table")
 	maxForks := fs.Int("max-forks", 200, "forks to probe (sampled by recent push, then stars)")
+	concurrency := fs.Int("concurrency", 1, "parallel fork requests; GitHub advises serial (1) to avoid secondary rate limits")
 	noForks := fs.Bool("no-forks", false, "skip the fork probe")
 	noMirror := fs.Bool("no-mirror", false, "skip the mirror-clone probe (PR refs, branches, tags)")
 	yes := fs.Bool("yes", false, "proceed past the request-estimate threshold")
@@ -147,7 +148,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		probes = append(probes, probe.Skipped{Label: "mirror", Surfaces: []model.Surface{model.SurfaceBranch, model.SurfacePRRef, model.SurfaceTag}})
 	}
 	if !*noForks {
-		probes = append(probes, probe.Forks{Client: client, Cap: *maxForks})
+		probes = append(probes, probe.Forks{Client: client, Cap: *maxForks, Concurrency: *concurrency})
 		est += len(commits)**maxForks + 10
 	} else {
 		probes = append(probes, probe.Skipped{Label: "forks", Surfaces: []model.Surface{model.SurfaceForkObject}})
