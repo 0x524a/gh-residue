@@ -1,4 +1,6 @@
 <picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/assets/banner-mobile-dark.png">
+  <source media="(max-width: 600px)" srcset="docs/assets/banner-mobile-light.png">
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.png">
   <img alt="A commit graph: the rewritten main branch is a solid line. An old commit hangs off it as a dashed ghost, still reachable through refs/pull/1/merge. A second ghost commit has no ref and resolves only by its SHA." src="docs/assets/banner-light.png" width="100%">
 </picture>

@@ -5,8 +5,10 @@
 <title>gh-residue banner</title>
 <!--
   Source for the README banner. Rendered to banner-light.png and banner-dark.png with
-  Playwright: open this file at 1280x460, emulate prefers-color-scheme light/dark, and
-  screenshot the #banner element at device scale. Fonts load from Google Fonts for the render
+  Playwright: open this file at 1280 wide, emulate prefers-color-scheme light/dark, and
+  screenshot #banner (wide, banner-*.png) and #banner-mobile (stacked, banner-mobile-*.png).
+  The mobile variant exists because GitHub scales the wide banner to ~25% on a phone, which
+  makes its labels unreadable; the README serves it below 600px. Fonts load from Google Fonts for the render
   only; the README embeds the PNGs, so readers never fetch them.
   No GitHub or Octocat logo appears here: the logos are reserved for GitHub Developer Program
   members (docs.github.com/en/integrations/concepts/github-developer-program).
@@ -50,6 +52,13 @@
   .t-ink { fill: var(--ink); font-size: 22px; }
   .t-uv { fill: var(--uv); font-size: 22px; font-weight: 700; }
   .t-dim { fill: var(--graphite); font-size: 20px; }
+
+  #banner-mobile { width: 1080px; height: 960px; position: relative; background: var(--paper); overflow: hidden; margin-top: 24px; }
+  #banner-mobile h1 { position: absolute; left: 60px; top: 78px; font-size: 138px; color: var(--ink); }
+  #banner-mobile p { position: absolute; left: 60px; top: 228px; width: 900px; margin: 0; font-size: 51px; }
+  .m-ink { fill: var(--ink); font-size: 24px; }
+  .m-uv { fill: var(--uv); font-size: 24px; font-weight: 700; }
+  .m-dim { fill: var(--graphite); font-size: 23px; }
 </style>
 </head>
 <body>
@@ -85,6 +94,32 @@
     <text class="mono t-uv" x="1034" y="366">78b6c2e</text>
     <text class="mono t-dim" x="1034" y="396">no ref, resolves by SHA</text>
     </g>
+  </svg>
+</div>
+
+<div id="banner-mobile">
+  <h1>gh-residue</h1>
+  <p>After a force-push, see which old commits GitHub still serves.</p>
+  <svg width="1080" height="960" viewBox="0 0 720 640" role="img" aria-label="A commit graph. The rewritten main branch is a solid line of commits. An old commit hangs off it as a dashed ghost, still reachable through refs/pull/1/merge. A second ghost commit has no ref and resolves only by its SHA.">
+    <path class="edge" d="M 60 330 H 640"/>
+    <g class="node">
+      <circle cx="60" cy="330" r="12"/><circle cx="190" cy="330" r="12"/><circle cx="320" cy="330" r="12"/>
+      <circle cx="450" cy="330" r="12"/><circle cx="580" cy="330" r="12"/>
+    </g>
+    <text class="mono m-ink" x="52" y="290">main</text>
+    <text class="mono m-dim" x="126" y="290">history rewritten</text>
+
+    <path class="ghost-edge" d="M 190 330 C 200 410, 230 440, 280 440"/>
+    <path class="ghost-edge" d="M 312 440 H 470"/>
+    <circle class="ghost" cx="296" cy="440" r="17"/>
+    <rect class="ref" x="482" y="422" width="40" height="36" rx="8"/>
+    <text class="mono m-uv" x="502" y="396" text-anchor="middle">refs/pull/1/merge</text>
+    <text class="mono m-uv" x="196" y="496">a8fe590</text>
+    <text class="mono m-dim" x="196" y="526">old commit, still reachable</text>
+
+    <circle class="ghost" cx="120" cy="590" r="17"/>
+    <text class="mono m-uv" x="152" y="584">78b6c2e</text>
+    <text class="mono m-dim" x="152" y="614">no ref, resolves by SHA</text>
   </svg>
 </div>
 </body>
