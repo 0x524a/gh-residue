@@ -1,0 +1,8 @@
+/gh-residue
+/gh-residue-*
+*.test
+*.out
+# checkpoints and Support drafts list leaked-commit SHAs: never commit them
+checkpoint*.json
+*.checkpoint.json
+support-draft*.md

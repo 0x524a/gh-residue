@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "tool_version": "test",
+  "repo": "acme/widgets",
+  "started_at": "2026-10-10T10:00:00Z",
+  "inputs": {
+    "source": "filter-repo",
+    "count": 3
+  },
+  "coverage": {
+    "probes_run": 3,
+    "probes_failed": 0,
+    "forks_total": 40,
+    "forks_checked": 2,
+    "surfaces": [
+      {
+        "surface": "base_object",
+        "complete": true
+      },
+      {
+        "surface": "branch",
+        "complete": true
+      },
+      {
+        "surface": "fork_object",
+        "complete": false
+      },
+      {
+        "surface": "pr_ref",
+        "complete": true
+      },
+      {
+        "surface": "tag",
+        "complete": true
+      }
+    ]
+  },
+  "findings": [
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "base_object",
+      "location": "acme/widgets",
+      "status": "confirmed",
+      "evidence": "HTTP 200",
+      "checked_at": "2026-10-10T09:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "branch",
+      "location": "refs/heads/release",
+      "status": "confirmed",
+      "evidence": "ref contains commit",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "fork_object",
+      "location": "fork-1/widgets",
+      "status": "confirmed",
+      "evidence": "HTTP 200",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "fork_object",
+      "location": "fork-2/widgets",
+      "status": "not_found",
+      "evidence": "HTTP 422 No commit found",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "pr_ref",
+      "location": "refs/pull/10/merge",
+      "status": "confirmed",
+      "evidence": "ref contains commit",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "pr_ref",
+      "location": "refs/pull/20/merge",
+      "status": "confirmed",
+      "evidence": "ref contains commit",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "pr_ref",
+      "location": "refs/pull/30/merge",
+      "status": "confirmed",
+      "evidence": "ref contains commit",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "pr_ref",
+      "location": "refs/pull/40/merge",
+      "status": "confirmed",
+      "evidence": "ref contains commit",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "pr_ref",
+      "location": "refs/pull/50/merge",
+      "status": "confirmed",
+      "evidence": "ref contains commit",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "pr_ref",
+      "location": "refs/pull/60/merge",
+      "status": "confirmed",
+      "evidence": "ref contains commit",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "pr_ref",
+      "location": "refs/pull/70/merge",
+      "status": "confirmed",
+      "evidence": "ref contains commit",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "surface": "tag",
+      "location": "*",
+      "status": "not_found",
+      "evidence": "no ref of this kind contains commit",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "surface": "base_object",
+      "location": "acme/widgets",
+      "status": "not_found",
+      "evidence": "HTTP 422 No commit found",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "surface": "branch",
+      "location": "*",
+      "status": "not_found",
+      "evidence": "object not in mirror",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "surface": "pr_ref",
+      "location": "*",
+      "status": "not_found",
+      "evidence": "object not in mirror",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "surface": "tag",
+      "location": "*",
+      "status": "not_found",
+      "evidence": "object not in mirror",
+      "checked_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "old_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "surface": "base_object",
+      "location": "acme/widgets",
+      "status": "unknown",
+      "evidence": "HTTP 404",
+      "checked_at": "2026-10-10T10:00:00Z"
+    }
+  ],
+  "carried": 1,
+  "resumed_from": "2026-10-10T09:00:00Z"
+}

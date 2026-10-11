@@ -1,0 +1,30 @@
+gh-residue: acme/widgets  (3 old SHAs from filter-repo)
+
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  confirmed    base_object acme/widgets                 HTTP 200
+  confirmed    branch      refs/heads/release           ref contains commit
+  confirmed    fork_object fork-1/widgets               HTTP 200
+  not_found    fork_object fork-2/widgets               HTTP 422 No commit found
+  confirmed    pr_ref      refs/pull/10/merge           ref contains commit
+  confirmed    pr_ref      refs/pull/20/merge           ref contains commit
+  confirmed    pr_ref      refs/pull/30/merge           ref contains commit
+  confirmed    pr_ref      refs/pull/40/merge           ref contains commit
+  confirmed    pr_ref      refs/pull/50/merge           ref contains commit
+               ... +2 more (full list in --json)
+  not_found    tag         *                            no ref of this kind contains commit
+
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  not_found    base_object acme/widgets                 HTTP 422 No commit found
+  not_found    branch      *                            object not in mirror
+  not_found    pr_ref      *                            object not in mirror
+  not_found    tag         *                            object not in mirror
+
+cccccccccccccccccccccccccccccccccccccccc
+  unknown      base_object acme/widgets                 HTTP 404
+
+Resumed from checkpoint: 1 result carried over unchanged (oldest checked 2026-10-10T09:00:00Z); the rest were re-checked.
+3 SHAs, 1 still exposed (1 via base_object, 1 via branch, 1 via fork_object, 7 via pr_ref); 1 check unknown. Exit code 1.
+Fork coverage: checked 2 of 40 forks (object-resolvable only; ref-holding not probed).
+Incomplete surfaces: fork_object. Treat as NOT clean.
+Not probed: web commit view (opt-in), ref-holding forks, local clones, CI caches, third-party mirrors, GH Archive.
+Rotate the credential first. This tool only verifies; only GitHub Support can purge cached views and PR refs.

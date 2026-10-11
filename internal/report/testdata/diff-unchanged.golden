@@ -1,0 +1,8 @@
+Diff against previous run:
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa base_object acme/widgets
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa branch      refs/heads/release
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa fork_object fork-1/widgets
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa pr_ref      refs/pull/10/merge
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa pr_ref      refs/pull/20/merge
+                  ... +5 more still-exposed
+  totals: 0 resolved, 10 still-exposed, 0 new, 0 now-unknown

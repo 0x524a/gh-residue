@@ -1,0 +1,134 @@
+// Package report renders a Run. Pure functions, no network.
+package report
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"sort"
+	"strings"
+
+	"github.com/0x524a/gh-residue/internal/model"
+)
+
+// maxRowsPerGroup caps table rows per (SHA, status, surface); JSON keeps all.
+const maxRowsPerGroup = 5
+
+func JSON(w io.Writer, r *model.Run) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(r)
+}
+
+// Table prints one row per (SHA, surface, location), grouped by SHA, a summary
+// line, and a footer that always says to rotate first.
+func Table(w io.Writer, r *model.Run) {
+	fmt.Fprintf(w, "gh-residue: %s  (%d old SHAs from %s)\n\n", r.Repo, r.Inputs.Count, r.Inputs.Source)
+
+	last := ""
+	var runKey string
+	runLen := 0
+	flush := func() {
+		if runLen > maxRowsPerGroup {
+			fmt.Fprintf(w, "  %s ... +%d more (full list in --json)\n", strings.Repeat(" ", 12), runLen-maxRowsPerGroup)
+		}
+		runLen = 0
+	}
+	for _, f := range r.Findings {
+		if f.OldSHA != last {
+			flush()
+			if last != "" {
+				fmt.Fprintln(w)
+			}
+			fmt.Fprintf(w, "%s\n", f.OldSHA)
+			last, runKey = f.OldSHA, ""
+		}
+		key := string(f.Status) + "/" + string(f.Surface)
+		if key != runKey {
+			flush()
+			runKey = key
+		}
+		runLen++
+		if runLen <= maxRowsPerGroup {
+			fmt.Fprintf(w, "  %-12s %-11s %-28s %s\n", f.Status, f.Surface, f.Location, f.Evidence)
+		}
+	}
+	flush()
+	if last != "" {
+		fmt.Fprintln(w)
+	}
+
+	if r.Carried > 0 {
+		fmt.Fprintf(w, "Resumed from checkpoint: %s carried over unchanged (oldest checked %s); the rest were re-checked.\n", plural(r.Carried, "result", "results"), oldestCheck(r))
+	}
+	fmt.Fprintln(w, summary(r))
+	if r.Coverage.ForksTotal > 0 {
+		fmt.Fprintf(w, "Fork coverage: checked %d of %d forks (object-resolvable only; ref-holding not probed).\n",
+			r.Coverage.ForksChecked, r.Coverage.ForksTotal)
+	}
+	var inc []string
+	for _, s := range r.Coverage.Surfaces {
+		if !s.Complete {
+			inc = append(inc, string(s.Surface))
+		}
+	}
+	if len(inc) > 0 {
+		fmt.Fprintf(w, "Incomplete surfaces: %s. Treat as NOT clean.\n", strings.Join(inc, ", "))
+	}
+	fmt.Fprintln(w, "Not probed: web commit view (opt-in), ref-holding forks, local clones, CI caches, third-party mirrors, GH Archive.")
+	fmt.Fprintln(w, "Rotate the credential first. This tool only verifies; only GitHub Support can purge cached views and PR refs.")
+}
+
+func summary(r *model.Run) string {
+	exposed := map[string]bool{}
+	byKind := map[model.Surface]int{}
+	unknown := 0
+	for _, f := range r.Findings {
+		switch f.Status {
+		case model.Confirmed:
+			exposed[f.OldSHA] = true
+			byKind[f.Surface]++
+		case model.NotFound:
+		default:
+			unknown++
+		}
+	}
+	shas := map[string]bool{}
+	for _, f := range r.Findings {
+		shas[f.OldSHA] = true
+	}
+	var parts []string
+	kinds := make([]string, 0, len(byKind))
+	for k := range byKind {
+		kinds = append(kinds, string(k))
+	}
+	sort.Strings(kinds)
+	for _, k := range kinds {
+		parts = append(parts, fmt.Sprintf("%d via %s", byKind[model.Surface(k)], k))
+	}
+	s := fmt.Sprintf("%d SHAs, %d still exposed", len(shas), len(exposed))
+	if len(parts) > 0 {
+		s += " (" + strings.Join(parts, ", ") + ")"
+	}
+	if unknown > 0 {
+		s += "; " + plural(unknown, "check", "checks") + " unknown"
+	}
+	return s + fmt.Sprintf(". Exit code %d.", r.ExitCode())
+}
+
+func oldestCheck(r *model.Run) string {
+	oldest := ""
+	for _, f := range r.Findings {
+		if f.CheckedAt != "" && (oldest == "" || f.CheckedAt < oldest) { // RFC3339 UTC sorts lexically
+			oldest = f.CheckedAt
+		}
+	}
+	return oldest
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", one)
+	}
+	return fmt.Sprintf("%d %s", n, many)
+}

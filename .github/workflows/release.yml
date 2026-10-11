@@ -1,0 +1,26 @@
+name: release
+
+# Tags containing a hyphen (v0.1.0-rc.1) become prereleases; use them to test this pipeline.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+      # Gate the release on the same checks as CI.
+      - run: go vet ./... && go test ./...
+      - uses: cli/gh-extension-precompile@76961aa3bd1123d0a6fd42d0a41aca0696937c39 # v2.2.0
+        with:
+          go_version_file: go.mod
+          go_build_options: ./cmd/gh-residue
+          generate_attestations: true

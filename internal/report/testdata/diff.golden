@@ -1,0 +1,13 @@
+Diff against previous run:
+  !! now-unknown  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa fork_object fork-1/widgets
+  new             aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa tag         refs/tags/v1
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa branch      refs/heads/release
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa pr_ref      refs/pull/10/merge
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa pr_ref      refs/pull/20/merge
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa pr_ref      refs/pull/30/merge
+  still-exposed   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa pr_ref      refs/pull/40/merge
+  resolved        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa base_object acme/widgets
+  resolved        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa pr_ref      refs/pull/70/merge
+                  ... +2 more still-exposed
+  totals: 2 resolved, 7 still-exposed, 1 new, 1 now-unknown
+  WARNING: some previously known results could not be re-established. Do not read them as resolved.
