@@ -114,3 +114,37 @@ func TestVersion(t *testing.T) {
 		t.Errorf("buildVersion: %q", got)
 	}
 }
+
+func TestEstimateSubtractsCheckpointedWork(t *testing.T) {
+	const a = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const b = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	commits := []model.OldCommit{{SHA: a}, {SHA: b}}
+
+	if n, clone := estimate("o/r", commits, nil, 200, true, true); n != 2+2*200+10 || !clone {
+		t.Errorf("fresh run: %d clone=%v", n, clone)
+	}
+
+	prev := &model.Run{Findings: []model.Finding{
+		{OldSHA: a, Surface: model.SurfaceBaseObject, Location: "o/r", Status: model.NotFound},
+		{OldSHA: b, Surface: model.SurfaceBaseObject, Location: "o/r", Status: model.Unknown}, // must be retried
+		{OldSHA: a, Surface: model.SurfaceBranch, Location: "*", Status: model.NotFound},
+		{OldSHA: a, Surface: model.SurfacePRRef, Location: "*", Status: model.NotFound},
+		{OldSHA: a, Surface: model.SurfaceTag, Location: "*", Status: model.NotFound},
+	}, Coverage: model.Coverage{Surfaces: []model.SurfaceCoverage{{Surface: model.SurfaceForkObject, Complete: true}}}}
+	// b has no known ref surfaces, so a clone is still needed; forks fully done.
+	if n, clone := estimate("o/r", commits, prev, 200, true, true); n != 1+10 || !clone {
+		t.Errorf("partial resume: %d clone=%v", n, clone)
+	}
+	// Everything known: nothing to request, no clone.
+	for _, s := range []model.Surface{model.SurfaceBranch, model.SurfacePRRef, model.SurfaceTag} {
+		prev.Findings = append(prev.Findings, model.Finding{OldSHA: b, Surface: s, Location: "*", Status: model.NotFound})
+	}
+	prev.Findings[1].Status = model.NotFound
+	if n, clone := estimate("o/r", commits, prev, 200, true, false); n != 0 || clone {
+		t.Errorf("all known: %d clone=%v", n, clone)
+	}
+	// Skipped mirror never needs a clone.
+	if _, clone := estimate("o/r", commits, nil, 200, false, false); clone {
+		t.Error("--no-mirror must not report a clone")
+	}
+}

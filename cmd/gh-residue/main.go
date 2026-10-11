@@ -139,21 +139,26 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	client := ghapi.New(token)
 
+	est, needClone := estimate(repo, commits, prevCheckpoint, *maxForks, !*noMirror, !*noForks)
 	probes := []probe.Probe{probe.BaseObject{Client: client}}
-	est := len(commits)
 	if !*noMirror {
 		probes = append(probes, probe.Mirror{CloneURL: "https://github.com/" + repo + ".git", Token: token})
-		fmt.Fprintln(stderr, "note: the mirror probe clones the repository into a temporary directory")
+		if needClone {
+			fmt.Fprintln(stderr, "note: the mirror probe clones the repository into a temporary directory")
+		}
 	} else {
 		probes = append(probes, probe.Skipped{Label: "mirror", Surfaces: []model.Surface{model.SurfaceBranch, model.SurfacePRRef, model.SurfaceTag}})
 	}
 	if !*noForks {
 		probes = append(probes, probe.Forks{Client: client, Cap: *maxForks, Concurrency: *concurrency})
-		est += len(commits)**maxForks + 10
 	} else {
 		probes = append(probes, probe.Skipped{Label: "forks", Surfaces: []model.Surface{model.SurfaceForkObject}})
 	}
-	fmt.Fprintf(stderr, "estimated API requests: up to ~%d\n", est)
+	if prevCheckpoint != nil {
+		fmt.Fprintf(stderr, "estimated API requests: up to ~%d (results carried over from the checkpoint are not re-requested)\n", est)
+	} else {
+		fmt.Fprintf(stderr, "estimated API requests: up to ~%d\n", est)
+	}
 	if est > estimateThreshold && !*yes {
 		fmt.Fprintf(stderr, "estimate exceeds %d; re-run with --yes to proceed\n", estimateThreshold)
 		return 2
@@ -261,4 +266,40 @@ func writeCheckpoint(path string, r *model.Run) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// estimate returns an upper bound on API requests and whether a clone is needed.
+// Results already known from a checkpoint are not counted: they are not re-requested.
+func estimate(repo string, commits []model.OldCommit, prev *model.Run, maxForks int, mirror, forks bool) (requests int, needClone bool) {
+	var known *probe.Known
+	var forksDone bool
+	if prev != nil {
+		known = probe.NewKnown(prev.Findings, commits)
+		for _, s := range prev.Coverage.Surfaces {
+			if s.Surface == model.SurfaceForkObject && s.Complete {
+				forksDone = true
+			}
+		}
+	}
+	for _, c := range commits {
+		if !known.Has(c.SHA, model.SurfaceBaseObject, repo) {
+			requests++
+		}
+		for _, s := range []model.Surface{model.SurfaceBranch, model.SurfacePRRef, model.SurfaceTag} {
+			if !known.SurfaceKnown(c.SHA, s) {
+				needClone = true
+			}
+		}
+	}
+	if !mirror {
+		needClone = false
+	}
+	if forks {
+		if forksDone {
+			requests += 10 // fork list pages only; every fork/SHA pair is already known
+		} else {
+			requests += len(commits)*maxForks + 10
+		}
+	}
+	return requests, needClone
 }
