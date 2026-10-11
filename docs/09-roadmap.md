@@ -14,6 +14,8 @@ Nothing in M1 or later starts before M0.
 
 ## Status log
 
+- 2026-10-11: build-provenance attestations enabled (verified on `rc.3`: SLSA provenance v1, subject digest matches the downloaded binary); stable `v0.1.0` released. M3 is done except exercising `gh extension install` on a clean machine and Windows verification.
+
 - 2026-10-11: repository made public under Apache-2.0 after a tree and history scan (no secrets, one author identity). README status block rewritten to match reality.
 
 - 2026-10-11 (M3 mostly done): private repo `0x524a/gh-residue`; CI (gofmt, vet, test) and a tag-triggered release using `cli/gh-extension-precompile` (pinned by SHA) produce a prerelease `v0.1.0-rc.2` with 12 platform binaries. Fork probing is now serial by default (`--concurrency`), per GitHub's best-practices page. Not done: `gh extension install` itself not exercised on a machine, artifact attestations (need permissions and, for private repos, a supporting plan), making the repo public, a licence (open question 10), Developer Program registration (needs a support email the owner has not chosen). Windows: the mirror probe's `GIT_ASKPASS` helper is a `sh` script; unverified on Windows.

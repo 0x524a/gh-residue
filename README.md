@@ -1,12 +1,12 @@
 # gh-residue
 
-> **Status: pre-release (`v0.1.0-rc.3`).** The verify command, Support-request draft, diff mode and checkpoint/resume work and are tested. Several claims are still unverified and tagged as such; see below.
+> **Status: early release (`v0.1.0`).** The verify command, Support-request draft, diff mode and checkpoint/resume work and are tested. Several claims are still unverified and tagged as such; see below.
 
 ## Where this stands
 
 - Works: base-repo, PR-ref, branch, tag and sampled-fork probes; table and JSON output; exit codes; `--support-draft`; `--against`; `--checkpoint`.
 - **Fork results mean "object resolvable", not "fork holds a ref".** Whether forks share one object store is untested (it needs a second account), and ref-holding forks are not probed yet, so the Support draft's *Ready for Support?* line can say `no` or `unknown` but never `yes`.
-- Not built yet: the web-view probe, org mode, artifact attestations on releases.
+- Not built yet: the web-view probe, org mode. Release binaries carry build-provenance attestations (`gh attestation verify <file> --repo 0x524a/gh-residue`, needs a recent `gh`).
 - The Windows build exists but is untested; the mirror probe passes the token through a `sh` helper.
 - Design and evidence: [`docs/`](docs/), the gating experiment in [`docs/spike/gate0-results.md`](docs/spike/gate0-results.md), and 11 open questions in [`docs/10-open-questions.md`](docs/10-open-questions.md).
 
@@ -17,7 +17,8 @@ A read-only `gh` extension that answers one question after you rewrite git histo
 ## Install and use
 
 ```bash
-gh extension install 0x524a/gh-residue --pin v0.1.0-rc.3   # prereleases must be pinned (there is no stable release yet)
+gh extension install 0x524a/gh-residue            # latest stable release
+gh extension install 0x524a/gh-residue --pin v0.1.0   # or a specific tag
 gh residue --version
 ```
 
