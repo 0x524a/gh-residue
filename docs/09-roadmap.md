@@ -14,6 +14,8 @@ Nothing in M1 or later starts before M0.
 
 ## Status log
 
+- 2026-10-11: README redesigned around a commit-graph banner drawn from the Gate 0 findings (light, dark and stacked mobile variants, checked on github.com at 390px and 1280px). Sample output in the README is real output, trimmed, with the repository name replaced. The Developer Program page was re-read: no logos until registration.
+
 - 2026-10-11: build-provenance attestations enabled (verified on `rc.3`: SLSA provenance v1, subject digest matches the downloaded binary); stable `v0.1.0` released. M3 is done except exercising `gh extension install` on a clean machine and Windows verification.
 
 - 2026-10-11: repository made public under Apache-2.0 after a tree and history scan (no secrets, one author identity). README status block rewritten to match reality.

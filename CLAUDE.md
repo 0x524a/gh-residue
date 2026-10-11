@@ -8,6 +8,8 @@ M1 (single-repo CLI) is implemented in Go (stdlib only, `go 1.22`). M0 was accep
 
 Packaging (M3): remote `0x524a/gh-residue` (public, Apache-2.0). Commit as `0x524a` using the repo-local identity (GitHub noreply email), never the global git identity. Release by bumping `baseVersion` in `cmd/gh-residue/main.go` and pushing a matching `v*` tag; tags containing `-` are prereleases. `dist/` must stay in `.gitignore` or builds report `-dirty`.
 
+README banner: source is `docs/assets/banner.html` (wide `#banner`, stacked `#banner-mobile`); the four PNGs are rendered from it with Playwright (serve the folder, emulate `prefers-color-scheme` light/dark, element-screenshot at device scale). Re-render after editing it; the README's `<picture>` picks by colour scheme and width (600px), verified on github.com. No GitHub or Octocat logo anywhere: those are reserved for GitHub Developer Program members and the project is not registered.
+
 ## Commands
 
 ```bash
