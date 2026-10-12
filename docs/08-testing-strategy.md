@@ -2,7 +2,7 @@
 
 ## Gate 0 status (2026-10-10)
 
-Facts 1 and 2 confirmed (private repo), and a public-repo run done (web view confirmed, Events API unreliable). Fact 3 (fork object store) is **not tested**: it needs a second account, which the owner does not have. GitHub's ToS permits one free machine account in addition to a personal account, a possible route. Results: [`spike/gate0-results.md`](spike/gate0-results.md). Both throwaway repos: the public one was deleted; the private one may still exist (see results).
+Facts 1 and 2 confirmed (private repo), and a public-repo run done (web view confirmed, Events API unreliable). Fact 3 (fork object store) is **not tested**: it needs a second account, which the owner does not have. GitHub's ToS permits one free machine account in addition to a personal account, a possible route. Results: [`spike/gate0-results.md`](spike/gate0-results.md). Both throwaway repos have been deleted (the private one on 2026-10-11).
 
 ## Gate 0: empirical spike (before any code)
 

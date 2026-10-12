@@ -8,7 +8,7 @@ M1 (single-repo CLI) is implemented in Go (stdlib only, `go 1.23`; the floor is 
 
 Packaging (M3): remote `0x524a/gh-residue` (public, Apache-2.0). Commit as `0x524a` using the repo-local identity (GitHub noreply email), never the global git identity. Release by bumping `baseVersion` in `cmd/gh-residue/main.go` and pushing a matching `v*` tag; tags containing `-` are prereleases. `dist/` must stay in `.gitignore` or builds report `-dirty`.
 
-README banner: source is `docs/assets/banner.html` (wide `#banner`, stacked `#banner-mobile`); the four PNGs are rendered from it with Playwright (serve the folder, emulate `prefers-color-scheme` light/dark, element-screenshot at device scale). Re-render after editing it; the README's `<picture>` picks by colour scheme and width (600px), verified on github.com. No GitHub or Octocat logo anywhere: those are reserved for GitHub Developer Program members and the project is not registered.
+README banner: source is `docs/assets/banner.html` (wide `#banner`, stacked `#banner-mobile`); the four PNGs are rendered from it with Playwright (serve the folder, emulate `prefers-color-scheme` light/dark, element-screenshot at device scale). Re-render after editing it; the README's `<picture>` picks by colour scheme and width (600px), verified on github.com. No GitHub or Octocat logo is used. The owner reports registering for the GitHub Developer Program on 2026-10-11 (acceptance not verified here); add a logo only if the owner asks, and follow github.com/logos guidelines, which have not been reviewed.
 
 ## Commands
 
@@ -50,4 +50,3 @@ Invariants that shape every doc and future code:
 - Claims not confirmed against official GitHub docs or an experiment are tagged **(unverified)** and tracked in `docs/10-open-questions.md`. Keep that list in sync when adding or resolving a claim; remove the tag only with evidence (cite the doc or `docs/spike/gate0-results.md`).
 - Docs are numbered 01–10; the README's doc map must stay consistent with them. Decisions go in `docs/adr/` as new numbered ADRs.
 - Gate 0 status: facts 1 (dangling SHA resolvable via REST commit endpoint) and 2 (`git clone --mirror` carries `refs/pull/*`) confirmed; fact 3 (shared fork object store) untested.
-- Loose end: private throwaway repo `0x524a/residue-spike-1791666833` still exists (kept for open question 13); delete with `gh repo delete 0x524a/residue-spike-1791666833 --yes` only when the owner says so.

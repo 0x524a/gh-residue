@@ -10,7 +10,7 @@ Not legal advice. A design-stage checklist.
 
 - Referential use of "GitHub" ("works with GitHub") is the intended use.
 - `gh-` is the required naming convention for `gh` extension repos; it is a convention, not an endorsement. The README states the project is unaffiliated with GitHub.
-- No GitHub or Octocat logo until accepted into the GitHub Developer Program, whose documented benefit includes permission to use them for integrations (docs.github.com, fetched 2026-10; no other documented perks found).
+- No GitHub or Octocat logo is used. The owner reports registering for the GitHub Developer Program on 2026-10-11, whose documented benefit includes permission to use them for integrations; any use must follow GitHub's logo guidelines (github.com/logos), which have not been reviewed (docs.github.com, fetched 2026-10; no other documented perks found).
 - Name-collision check, 2026-10: no `gh-residue` repo found; `gh-residue` free on PyPI, npm, crates.io. Bare `residue` is taken on PyPI and npm; `abumq/residue` (40 stars) is an unrelated logging server. **Not a trademark search.**
 
 ## Terms of service
@@ -30,4 +30,4 @@ Fork owners' usernames are other people's data: local output only, omitted from 
 
 Re-read 2026-10-11: membership is open to individuals and companies with (1) an integration in production or development using the GitHub API and (2) an email address where GitHub users can contact them for support. The documented benefits are permission to use the Octocat or GitHub logo to show the product works with GitHub, and promoting the integration with a video or blog post.
 
-Status 2026-10-11: both criteria are met. The tool uses the REST API and `v0.1.0` is released, and the owner has chosen a public support email, `0x524a@gmail.com`, now listed in the README. **Registration itself has not been done**: it is a form at github.com/developer/register that the owner submits. Until then no GitHub or Octocat logo is used anywhere, and registration carries no legal bearing on the licence.
+Status 2026-10-11: both criteria are met. The tool uses the REST API and `v0.1.0` is released, and the owner chose a public support email, `0x524a@gmail.com`, now listed in the README. **The owner reports having registered** (form at github.com/developer/register); GitHub's confirmation is not visible from here, so treat membership as reported, not verified. No logo has been added, and registration carries no legal bearing on the licence.

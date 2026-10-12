@@ -12,7 +12,7 @@ Last updated 2026-10-10. Closed items are kept (struck through) so the trail is 
 | 9 | Commercial products already covering post-rewrite verification | doc 01 | Survey beyond GitHub repo search |
 | 11 | Default fork cap (200) is reasonable (concurrency is now 1 per GitHub's best-practices page) | doc 05 | Tune after M1 |
 | 12 | Formal trademark clearance for the name | doc 07 | Separate legal step, if desired |
-| 13 | How long `refs/pull/N/merge` keeps the old commit after a PR-branch force-push (seen about 1 minute) | doc 03 | Re-probe the spike repo over time; GitHub docs |
+| 13 | How long `refs/pull/N/merge` keeps the old commit after a PR-branch force-push (seen about 1 minute) | doc 03 | Repeat the Gate 0 scenario in a new throwaway repo and poll `refs/pull/N/merge` over time (the original spike repo was deleted 2026-10-11); GitHub docs |
 | 14 | ~~Web commit view status for a dangling SHA on a public repo~~ | docs 03, ADR-0005 | **Closed 2026-10-10:** HTTP 200 for both rewritten commits (spike run 2). Still opt-in per doc 07 |
 | 15 | Whether the Events API records force-pushes as `PushEvent` (run 2: it did not, within minutes, for either rewrite) | doc 05 | Re-check after some hours; treat as unreliable meanwhile |
 | 16 | GraphQL `beforeCommit` documentation and retention for old-SHA discovery (works in Gate 0; not in the fetched reference page) | doc 05 | GraphQL docs in a browser; test on older PRs |
