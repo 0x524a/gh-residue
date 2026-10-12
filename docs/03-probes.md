@@ -8,12 +8,12 @@ Every probe answers: is old SHA X still reachable via surface Y? Any error, time
 | 2 | PR refs and ancestry | Temp bare `git clone --mirror` (carries `refs/pull/*`, **confirmed**), then `git for-each-ref --contains <sha>` | Which refs (`refs/pull/N/head`, `merge`, tags) reach the SHA, including as an ancestor of a PR tip. Gate 0: `refs/pull/N/merge` kept the old commit as a parent after the PR branch was force-pushed | Dangling objects the mirror does not fetch (a SHA absent from a *successful* mirror is `not_found` for ref surfaces; a failed clone is `unknown`). Gate 0: a commit removed from `main` was invisible here and seen only by probe 1 |
 | 3 | Fork network | `GET /repos/{o}/{r}/forks` (paginated), probe 1 per fork | Object resolvable through that fork's URL | See caveat |
 | 4 | Tags and releases | Covered by probe 2 (`--contains` includes tags) | Tag reachability | Release notes or asset contents (not commits; out of scope) |
-| 5 | Web commit view | `HEAD https://github.com/{o}/{r}/commit/{sha}` | The cached view Support removes. Gate 0 run 2: 200 for rewritten commits on a public repo, agreeing with probe 1 | Anything the API hides (none observed). Needs no token on public repos; 404 for private repos unauthenticated. **Opt-in only** (ADR-0005) |
+| 5 | Web commit view | `HEAD https://github.com/{o}/{r}/commit/{sha}` | The cached view Support removes. Gate 0 run 2: 200 for rewritten commits on a public repo, agreeing with probe 1 | Anything the API hides (none observed). Needs no token on public repos; 404 for private repos unauthenticated. **Opt-in only** (ADR-0005); **not implemented yet** |
 
 ## Caveats
 
 - **Forks share Git data (verified 2026-10-12, doc 10 item 6).** A hit on a fork's commit URL means the object exists in the network, not that the fork holds a ref to it. The report separates *object resolvable* (cheap) from *ref-holding* (`--fork-refs`, opt-in, below).
-- **Large networks.** Repos can have thousands of forks. Default cap 200 (tunable), prioritized by recent push activity and stars. Output always prints coverage ("checked 200 of 4,312 forks"). See ADR-0004.
+- **Large networks.** Repos can have thousands of forks. Default cap 200 (`--max-forks`), prioritized by recent push activity and stars **among the first 1000 forks GitHub lists** (oldest first); a larger network is reported as incomplete coverage, never as complete. Output always prints coverage ("checked 200 of 4,312 forks"). See ADR-0004.
 - **Probe 2 costs a clone.** Warn on large repos; use a temp dir with restrictive permissions, always deleted, including on error.
 - **Probe 5 is automated access to web pages.** Off by default until GitHub's terms on automated access are reviewed (doc 07).
 - The tool downloads content only from the user's own repo (probe 2), never from forks.
