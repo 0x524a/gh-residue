@@ -1,6 +1,8 @@
 package input
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -31,5 +33,32 @@ func TestCommitMap(t *testing.T) {
 	}
 	if _, err := ParseCommitMap(strings.NewReader(a + " short\n")); err == nil {
 		t.Fatal("malformed line must error")
+	}
+}
+
+func TestFirstChanged(t *testing.T) {
+	got, err := parseFirstChanged(strings.NewReader(a + " " + b + "\n\n" + c + " " + b + "\n"))
+	if err != nil || len(got) != 2 || got[0] != a || got[1] != c {
+		t.Fatalf("got %v err %v", got, err)
+	}
+	if _, err := parseFirstChanged(strings.NewReader("short " + b + "\n")); err == nil {
+		t.Fatal("malformed line must error, not be skipped")
+	}
+}
+
+func TestLoadFirstChangedMissingFileIsNilNotGuess(t *testing.T) {
+	got, err := LoadFirstChanged(t.TempDir())
+	if got != nil || err != nil {
+		t.Fatalf("got %v err %v", got, err)
+	}
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".git", "filter-repo"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".git", "filter-repo", "first-changed-commits"), []byte(a+" "+b+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := LoadFirstChanged(dir); err != nil || len(got) != 1 || got[0] != a {
+		t.Fatalf("got %v err %v", got, err)
 	}
 }

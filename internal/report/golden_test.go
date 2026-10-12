@@ -106,7 +106,7 @@ func TestGoldenJSON(t *testing.T) {
 
 func TestGoldenSupportDraft(t *testing.T) {
 	var b bytes.Buffer
-	SupportDraft(&b, fixtureRun(), SupportOpts{FirstChanged: []string{shaA}, Inferred: true, LFSFile: "lfs-orphans.txt"})
+	SupportDraft(&b, fixtureRun(), SupportOpts{FirstChanged: []string{shaA}, Source: "read from filter-repo's first-changed-commits file", LFSFile: "lfs-orphans.txt"})
 	golden(t, "support-full", b.Bytes())
 
 	b.Reset()

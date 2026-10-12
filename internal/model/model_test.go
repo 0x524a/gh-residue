@@ -40,6 +40,15 @@ func TestExitCode(t *testing.T) {
 	}
 }
 
+func TestForkIncompleteReasonBlocksClean(t *testing.T) {
+	cov := complete
+	cov.ForksIncompleteReason = "forks of forks are not checked"
+	r := run(cov, NotFound)
+	if !r.Incomplete() || r.ExitCode() != 2 {
+		t.Fatalf("a recorded fork-coverage reason must make the run incomplete: incomplete=%v exit=%d", r.Incomplete(), r.ExitCode())
+	}
+}
+
 func TestSortDeterministic(t *testing.T) {
 	r := &Run{Findings: []Finding{
 		{OldSHA: "b", Surface: SurfacePRRef, Location: "2"},

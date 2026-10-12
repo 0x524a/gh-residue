@@ -15,7 +15,9 @@ type Result struct {
 	Surfaces     []model.SurfaceCoverage
 	ForksTotal   int
 	ForksChecked int
-	Failed       bool // the probe could not run at all
+	// Set when listed forks cannot be taken as all forks: see model.Coverage.
+	ForksIncompleteReason string
+	Failed                bool // the probe could not run at all
 }
 
 type Probe interface {

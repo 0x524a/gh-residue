@@ -62,13 +62,16 @@ func Table(w io.Writer, r *model.Run) {
 		fmt.Fprintf(w, "Resumed from checkpoint: %s carried over unchanged (oldest checked %s); the rest were re-checked.\n", plural(r.Carried, "result", "results"), oldestCheck(r))
 	}
 	fmt.Fprintln(w, summary(r))
-	if r.Coverage.ForksTotal > 0 {
+	if r.Coverage.ForksTotal > 0 || r.Coverage.ForksIncompleteReason != "" {
 		what := "object-resolvable only; ref-holding not probed"
 		if hasSurface(r, model.SurfaceForkRef) {
 			what = "object-resolvable and ref-holding"
 		}
 		fmt.Fprintf(w, "Fork coverage: checked %d of %d forks (%s).\n",
 			r.Coverage.ForksChecked, r.Coverage.ForksTotal, what)
+		if r.Coverage.ForksIncompleteReason != "" {
+			fmt.Fprintf(w, "Fork coverage is incomplete: %s.\n", r.Coverage.ForksIncompleteReason)
+		}
 	}
 	var inc []string
 	for _, s := range r.Coverage.Surfaces {

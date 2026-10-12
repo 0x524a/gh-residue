@@ -21,7 +21,8 @@ var (
 	headRe   = regexp.MustCompile(`headRef:"([0-9a-f]{40})"`)
 )
 
-// refNode is one ref in the fake fork: compare status per SHA.
+// refNode is one ref in the fake fork. name is relative to "refs/", as GitHub
+// returns it for refPrefix "refs/": "heads/main", "tags/v1", "notes/amlog".
 type refNode struct {
 	name   string
 	status map[string]string // sha -> IDENTICAL|BEHIND|AHEAD|DIVERGED|""(null)
@@ -30,24 +31,23 @@ type refNode struct {
 type fakeGQL struct {
 	mu    sync.Mutex
 	calls int
-	// handler returns (nodes, hasNext, endCursor, httpStatus, rawOverride)
-	page func(repo, prefix, after string) (nodes []refNode, hasNext bool, cursor string)
-	raw  func(repo, prefix string) (status int, body string, override bool)
+	prs   func(repo string) int // pull requests in the fork
+	page  func(repo, after string) (nodes []refNode, hasNext bool, cursor string)
+	raw   func(repo string) (status int, body string, override bool)
 }
 
-func (f *fakeGQL) serve() (*ghapi.Client, func()) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/graphql" {
-			w.WriteHeader(404)
-			return
-		}
+func (f *fakeGQL) handler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		var req struct {
 			Query     string
 			Variables map[string]any
 		}
 		_ = json.Unmarshal(b, &req)
-		prefix := prefixRe.FindStringSubmatch(req.Query)[1]
+		if m := prefixRe.FindStringSubmatch(req.Query); m == nil || m[1] != "refs/" {
+			w.WriteHeader(400) // the check must ask for every non-pull namespace, not just heads/tags
+			return
+		}
 		var shas []string
 		for _, m := range headRe.FindAllStringSubmatch(req.Query, -1) {
 			shas = append(shas, m[1])
@@ -58,13 +58,13 @@ func (f *fakeGQL) serve() (*ghapi.Client, func()) {
 		f.calls++
 		f.mu.Unlock()
 		if f.raw != nil {
-			if st, body, ok := f.raw(repo, prefix); ok {
+			if st, body, ok := f.raw(repo); ok {
 				w.WriteHeader(st)
 				w.Write([]byte(body))
 				return
 			}
 		}
-		nodes, hasNext, cursor := f.page(repo, prefix, after)
+		nodes, hasNext, cursor := f.page(repo, after)
 		var out []map[string]any
 		for _, n := range nodes {
 			m := map[string]any{"name": n.name}
@@ -77,34 +77,40 @@ func (f *fakeGQL) serve() (*ghapi.Client, func()) {
 			}
 			out = append(out, m)
 		}
-		resp := map[string]any{"data": map[string]any{"repository": map[string]any{"refs": map[string]any{
-			"pageInfo": map[string]any{"hasNextPage": hasNext, "endCursor": cursor}, "nodes": out}}}}
-		json.NewEncoder(w).Encode(resp)
-	}))
+		prs := 0
+		if f.prs != nil {
+			prs = f.prs(repo)
+		}
+		json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"repository": map[string]any{
+			"pullRequests": map[string]any{"totalCount": prs},
+			"refs":         map[string]any{"pageInfo": map[string]any{"hasNextPage": hasNext, "endCursor": cursor}, "nodes": out},
+		}}})
+	})
+}
+
+func (f *fakeGQL) serve() (*ghapi.Client, func()) {
+	mux := http.NewServeMux()
+	mux.Handle("/graphql", f.handler())
+	srv := httptest.NewServer(mux)
 	c := ghapi.New("test-token")
 	c.BaseURL = srv.URL
 	return c, srv.Close
 }
 
-func only(prefix, name string, status map[string]string) func(string, string, string) ([]refNode, bool, string) {
-	return func(_, p, _ string) ([]refNode, bool, string) {
-		if p == prefix {
-			return []refNode{{name: name, status: status}}, false, ""
-		}
-		return nil, false, ""
+func one(name string, status map[string]string) func(string, string) ([]refNode, bool, string) {
+	return func(string, string) ([]refNode, bool, string) {
+		return []refNode{{name: name, status: status}}, false, ""
 	}
 }
 
 func TestForkRefHoldersStatuses(t *testing.T) {
 	shaA, shaB, shaC, shaD := strings.Repeat("a", 40), strings.Repeat("b", 40), strings.Repeat("c", 40), strings.Repeat("d", 40)
-	f := &fakeGQL{page: func(_, p, _ string) ([]refNode, bool, string) {
-		if p == "refs/heads/" {
-			return []refNode{
-				{name: "main", status: map[string]string{shaA: "BEHIND", shaB: "AHEAD", shaC: "DIVERGED", shaD: "AHEAD"}},
-				{name: "dev", status: map[string]string{shaA: "IDENTICAL", shaB: "DIVERGED", shaC: "AHEAD", shaD: "AHEAD"}},
-			}, false, ""
-		}
-		return []refNode{{name: "v1", status: map[string]string{shaA: "BEHIND", shaB: "AHEAD", shaC: "AHEAD", shaD: "AHEAD"}}}, false, ""
+	f := &fakeGQL{page: func(string, string) ([]refNode, bool, string) {
+		return []refNode{
+			{name: "heads/main", status: map[string]string{shaA: "BEHIND", shaB: "AHEAD", shaC: "DIVERGED", shaD: "AHEAD"}},
+			{name: "heads/dev", status: map[string]string{shaA: "IDENTICAL", shaB: "DIVERGED", shaC: "AHEAD", shaD: "AHEAD"}},
+			{name: "tags/v1", status: map[string]string{shaA: "BEHIND", shaB: "AHEAD", shaC: "AHEAD", shaD: "AHEAD"}},
+		}, false, ""
 	}}
 	c, done := f.serve()
 	defer done()
@@ -119,28 +125,64 @@ func TestForkRefHoldersStatuses(t *testing.T) {
 	}
 }
 
+// A ref outside heads/ and tags/ (refs/notes, refs/remotes, refs/original...) must be seen.
+func TestForkRefHoldersSeesOtherNamespaces(t *testing.T) {
+	sha := strings.Repeat("a", 40)
+	for _, ref := range []string{"notes/amlog", "remotes/origin/main", "original/refs/heads/main"} {
+		f := &fakeGQL{page: func(string, string) ([]refNode, bool, string) {
+			return []refNode{
+				{name: "heads/main", status: map[string]string{sha: "AHEAD"}},
+				{name: ref, status: map[string]string{sha: "BEHIND"}},
+			}, false, ""
+		}}
+		c, done := f.serve()
+		v := forkRefHolders(context.Background(), c, "x/fork", []string{sha})[sha]
+		done()
+		if v.Status != model.Confirmed || v.Evidence != "refs/"+ref {
+			t.Errorf("%s: %+v", ref, v)
+		}
+	}
+}
+
+// A fork's own refs/pull/* are invisible to GraphQL, so a fork with pull requests can't be called clean.
+func TestForkRefHoldersForkWithPullRequestsIsNeverClean(t *testing.T) {
+	sha := strings.Repeat("a", 40)
+	f := &fakeGQL{prs: func(string) int { return 3 }, page: one("heads/main", map[string]string{sha: "AHEAD"})}
+	c, done := f.serve()
+	defer done()
+	if v := forkRefHolders(context.Background(), c, "x/fork", []string{sha})[sha]; v.Status != model.Unknown || !strings.Contains(v.Evidence, "3 pull requests") {
+		t.Errorf("fork with PRs and no proven holder: %+v", v)
+	}
+	// ...but a holder already proven stands.
+	f2 := &fakeGQL{prs: func(string) int { return 3 }, page: one("heads/main", map[string]string{sha: "BEHIND"})}
+	c2, done2 := f2.serve()
+	defer done2()
+	if v := forkRefHolders(context.Background(), c2, "x/fork", []string{sha})[sha]; v.Status != model.Confirmed {
+		t.Errorf("proven holder must stand: %+v", v)
+	}
+	// No pull requests: clean means clean.
+	f3 := &fakeGQL{page: one("heads/main", map[string]string{sha: "AHEAD"})}
+	c3, done3 := f3.serve()
+	defer done3()
+	if v := forkRefHolders(context.Background(), c3, "x/fork", []string{sha})[sha]; v.Status != model.NotFound {
+		t.Errorf("%+v", v)
+	}
+}
+
 // ADR-0002 property: no failure shape may produce NotFound.
 func TestForkRefHoldersFailuresAreUnknown(t *testing.T) {
 	sha := strings.Repeat("a", 40)
-	okPage := only("refs/heads/", "main", map[string]string{sha: "AHEAD"})
+	okPage := one("heads/main", map[string]string{sha: "AHEAD"})
 	cases := map[string]*fakeGQL{
-		"http 500":      {page: okPage, raw: func(string, string) (int, string, bool) { return 500, "", true }},
-		"http 502 html": {page: okPage, raw: func(string, string) (int, string, bool) { return 502, "<html>", true }},
-		"graphql errors": {page: okPage, raw: func(string, string) (int, string, bool) {
-			return 200, `{"errors":[{"message":"Something went wrong"}]}`, true
-		}},
-		"repository null": {page: okPage, raw: func(string, string) (int, string, bool) { return 200, `{"data":{"repository":null}}`, true }},
-		"bad json":        {page: okPage, raw: func(string, string) (int, string, bool) { return 200, `{not json`, true }},
-		"compare null":    {page: only("refs/heads/", "main", map[string]string{sha: ""})},
-		"weird status":    {page: only("refs/heads/", "main", map[string]string{sha: "UNEXPECTED"})},
-		"endless pages": {page: func(string, string, string) ([]refNode, bool, string) {
-			return []refNode{{name: "b", status: map[string]string{sha: "AHEAD"}}}, true, "next"
-		}},
-		"tags query fails only": {page: okPage, raw: func(_, p string) (int, string, bool) {
-			if p == "refs/tags/" {
-				return 500, "", true
-			}
-			return 0, "", false
+		"http 500":        {page: okPage, raw: func(string) (int, string, bool) { return 500, "", true }},
+		"http 502 html":   {page: okPage, raw: func(string) (int, string, bool) { return 502, "<html>", true }},
+		"graphql errors":  {page: okPage, raw: func(string) (int, string, bool) { return 200, `{"errors":[{"message":"Something went wrong"}]}`, true }},
+		"repository null": {page: okPage, raw: func(string) (int, string, bool) { return 200, `{"data":{"repository":null}}`, true }},
+		"bad json":        {page: okPage, raw: func(string) (int, string, bool) { return 200, `{not json`, true }},
+		"compare null":    {page: one("heads/main", map[string]string{sha: ""})},
+		"weird status":    {page: one("heads/main", map[string]string{sha: "UNEXPECTED"})},
+		"endless pages": {page: func(string, string) ([]refNode, bool, string) {
+			return []refNode{{name: "heads/b", status: map[string]string{sha: "AHEAD"}}}, true, "next"
 		}},
 	}
 	for name, f := range cases {
@@ -151,26 +193,29 @@ func TestForkRefHoldersFailuresAreUnknown(t *testing.T) {
 			t.Errorf("%s: got %s (%s), want unknown", name, got[sha].Status, got[sha].Evidence)
 		}
 	}
-	// An anonymous client cannot call GraphQL at all.
-	anon := ghapi.New("")
+	anon := ghapi.New("") // an anonymous client cannot call GraphQL at all
 	if got := forkRefHolders(context.Background(), anon, "x/fork", []string{sha}); got[sha].Status != model.Unknown {
 		t.Errorf("anonymous: %+v", got[sha])
 	}
-	// A malformed SHA is never inlined into a query.
-	f := &fakeGQL{page: okPage}
+	f := &fakeGQL{page: okPage} // a malformed SHA is never inlined into a query
 	c, done := f.serve()
 	defer done()
-	if got := forkRefHolders(context.Background(), c, "x/fork", []string{`abc"){x}`}); got[`abc"){x}`].Status != model.Unknown || f.calls != 0 {
+	bad := `abc"){x}`
+	if got := forkRefHolders(context.Background(), c, "x/fork", []string{bad}); got[bad].Status != model.Unknown || f.calls != 0 {
 		t.Errorf("bad sha must be unknown without a request: %+v calls=%d", got, f.calls)
 	}
 }
 
 func TestForkRefHoldersProvenHolderSurvivesLaterFailure(t *testing.T) {
 	sha := strings.Repeat("a", 40)
+	calls := 0
 	f := &fakeGQL{
-		page: only("refs/heads/", "main", map[string]string{sha: "BEHIND"}),
-		raw: func(_, p string) (int, string, bool) {
-			if p == "refs/tags/" {
+		page: func(string, string) ([]refNode, bool, string) {
+			return []refNode{{name: "heads/main", status: map[string]string{sha: "BEHIND"}}}, true, "c1"
+		},
+		raw: func(string) (int, string, bool) {
+			calls++
+			if calls > 1 { // second page fails
 				return 500, "", true
 			}
 			return 0, "", false
@@ -185,14 +230,11 @@ func TestForkRefHoldersProvenHolderSurvivesLaterFailure(t *testing.T) {
 
 func TestForkRefHoldersPaginates(t *testing.T) {
 	sha := strings.Repeat("a", 40)
-	f := &fakeGQL{page: func(_, p, after string) ([]refNode, bool, string) {
-		if p != "refs/heads/" {
-			return nil, false, ""
-		}
+	f := &fakeGQL{page: func(_, after string) ([]refNode, bool, string) {
 		if after == "" {
-			return []refNode{{name: "first", status: map[string]string{sha: "AHEAD"}}}, true, "cur1"
+			return []refNode{{name: "heads/first", status: map[string]string{sha: "AHEAD"}}}, true, "cur1"
 		}
-		return []refNode{{name: "second", status: map[string]string{sha: "BEHIND"}}}, false, ""
+		return []refNode{{name: "heads/second", status: map[string]string{sha: "BEHIND"}}}, false, ""
 	}}
 	c, done := f.serve()
 	defer done()
@@ -203,19 +245,18 @@ func TestForkRefHoldersPaginates(t *testing.T) {
 
 func TestForkRefHoldersChunksManySHAs(t *testing.T) {
 	var shas []string
-	for i := 0; i < 45; i++ {
-		shas = append(shas, fmt.Sprintf("%040x", i+1))
-	}
 	status := map[string]string{}
-	for _, s := range shas {
+	for i := 0; i < 45; i++ {
+		s := fmt.Sprintf("%040x", i+1)
+		shas = append(shas, s)
 		status[s] = "AHEAD"
 	}
 	status[shas[44]] = "BEHIND"
-	f := &fakeGQL{page: only("refs/heads/", "main", status)}
+	f := &fakeGQL{page: one("heads/main", status)}
 	c, done := f.serve()
 	defer done()
 	got := forkRefHolders(context.Background(), c, "x/fork", shas)
-	if f.calls != 3*2 { // 45 SHAs = 3 chunks of 20, each queried for heads and tags
+	if f.calls != 3 { // 45 SHAs = 3 chunks of 20, one query each
 		t.Errorf("calls=%d", f.calls)
 	}
 	if got[shas[44]].Status != model.Confirmed || got[shas[0]].Status != model.NotFound {
@@ -223,71 +264,77 @@ func TestForkRefHoldersChunksManySHAs(t *testing.T) {
 	}
 }
 
-// End to end through the Forks probe.
-func TestForksProbeWithRefs(t *testing.T) {
-	obj := func(w http.ResponseWriter, r *http.Request, repo, sha string) bool {
-		switch repo {
-		case "a/gone": // cannot resolve the object
-			w.WriteHeader(422)
-			w.Write([]byte(`{"message":"No commit found for SHA"}`))
-		case "d/flaky": // object check itself fails
-			w.WriteHeader(502)
-		default:
-			w.WriteHeader(200)
-		}
-		return true
+// restAndGraphQL serves the REST fork endpoints and a fake GraphQL on one server.
+func restAndGraphQL(t *testing.T, forksJSON string, forksCount int, objectStatus func(repo string) int, g *fakeGQL) *ghapi.Client {
+	t.Helper()
+	mux := http.NewServeMux()
+	if g != nil {
+		mux.Handle("/graphql", g.handler())
 	}
-	gql := &fakeGQL{page: func(repo, p, _ string) ([]refNode, bool, string) {
-		sha := strings.Repeat("a", 40)
-		if repo == "b/holder" && p == "refs/heads/" {
-			return []refNode{{name: "main", status: map[string]string{sha: "BEHIND"}}}, false, ""
-		}
-		return []refNode{{name: "main", status: map[string]string{sha: "AHEAD"}}}, false, ""
-	}, raw: func(repo, p string) (int, string, bool) {
-		if repo == "c/broken" {
-			return 500, "", true
-		}
-		return 0, "", false
-	}}
-	gc, gdone := gql.serve()
-	defer gdone()
-	rest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
 		switch {
 		case p == "/repos/o/r":
-			fmt.Fprint(w, `{"forks_count":5}`)
+			fmt.Fprintf(w, `{"forks_count":%d}`, forksCount)
 		case p == "/repos/o/r/forks":
-			fmt.Fprint(w, `[{"full_name":"a/gone","pushed_at":"2026-05-01T00:00:00Z"},{"full_name":"b/holder","pushed_at":"2026-04-01T00:00:00Z"},{"full_name":"c/broken","pushed_at":"2026-03-01T00:00:00Z"},{"full_name":"d/flaky","pushed_at":"2026-02-01T00:00:00Z"},{"full_name":"e/clean","pushed_at":"2026-01-01T00:00:00Z"}]`)
+			fmt.Fprint(w, forksJSON)
 		case strings.Contains(p, "/commits/"):
 			parts := strings.Split(p, "/")
-			obj(w, r, parts[2]+"/"+parts[3], parts[len(parts)-1])
+			st := objectStatus(parts[2] + "/" + parts[3])
+			w.WriteHeader(st)
+			if st == 422 {
+				w.Write([]byte(`{"message":"No commit found for SHA"}`))
+			}
 		default:
 			w.WriteHeader(404)
 		}
-	}))
-	defer rest.Close()
-	client := ghapi.New("test-token")
-	client.BaseURL = rest.URL
-	// GraphQL goes to its own fake: wire it by pointing GraphQL at the same base via a mux.
-	mux := http.NewServeMux()
-	mux.Handle("/graphql", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := http.NewRequest("POST", gc.BaseURL+"/graphql", r.Body)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			w.WriteHeader(502)
-			return
-		}
-		defer resp.Body.Close()
-		w.WriteHeader(resp.StatusCode)
-		io.Copy(w, resp.Body)
-	}))
-	mux.Handle("/", rest.Config.Handler)
-	both := httptest.NewServer(mux)
-	defer both.Close()
-	client.BaseURL = both.URL
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	c := ghapi.New("test-token")
+	c.BaseURL = srv.URL
+	return c
+}
 
+func surfaceDone(res Result, s model.Surface) (complete, present bool) {
+	for _, c := range res.Surfaces {
+		if c.Surface == s {
+			return c.Complete, true
+		}
+	}
+	return false, false
+}
+
+// End to end through the Forks probe.
+func TestForksProbeWithRefs(t *testing.T) {
 	sha := strings.Repeat("a", 40)
-	res := Forks{Client: client, Refs: true}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	g := &fakeGQL{
+		page: func(repo, _ string) ([]refNode, bool, string) {
+			if repo == "b/holder" {
+				return []refNode{{name: "heads/main", status: map[string]string{sha: "BEHIND"}}}, false, ""
+			}
+			return []refNode{{name: "heads/main", status: map[string]string{sha: "AHEAD"}}}, false, ""
+		},
+		raw: func(repo string) (int, string, bool) {
+			if repo == "c/broken" {
+				return 500, "", true
+			}
+			return 0, "", false
+		},
+	}
+	c := restAndGraphQL(t,
+		`[{"full_name":"a/gone","pushed_at":"2026-05-01T00:00:00Z"},{"full_name":"b/holder","pushed_at":"2026-04-01T00:00:00Z"},{"full_name":"c/broken","pushed_at":"2026-03-01T00:00:00Z"},{"full_name":"d/flaky","pushed_at":"2026-02-01T00:00:00Z"},{"full_name":"e/clean","pushed_at":"2026-01-01T00:00:00Z"}]`,
+		5,
+		func(repo string) int {
+			switch repo {
+			case "a/gone":
+				return 422 // cannot resolve the object
+			case "d/flaky":
+				return 502 // object check itself fails
+			}
+			return 200
+		}, g)
+	res := Forks{Client: c, Refs: true}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
 
 	got := map[string]model.Status{}
 	for _, f := range res.Findings {
@@ -307,14 +354,8 @@ func TestForksProbeWithRefs(t *testing.T) {
 			t.Errorf("%s: got %q want %q", k, got[k], v)
 		}
 	}
-	var refCov *model.SurfaceCoverage
-	for i := range res.Surfaces {
-		if res.Surfaces[i].Surface == model.SurfaceForkRef {
-			refCov = &res.Surfaces[i]
-		}
-	}
-	if refCov == nil || refCov.Complete {
-		t.Errorf("unknown results must leave fork_ref incomplete: %+v", refCov)
+	if done, present := surfaceDone(res, model.SurfaceForkRef); !present || done {
+		t.Errorf("unknown results must leave fork_ref incomplete: done=%v present=%v", done, present)
 	}
 }
 
@@ -322,29 +363,80 @@ func TestForksWithoutRefsEmitsNoForkRefSurface(t *testing.T) {
 	c, done := apiClient(forksServer(3, "nobody"))
 	defer done()
 	res := Forks{Client: c}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
-	for _, s := range res.Surfaces {
-		if s.Surface == model.SurfaceForkRef {
-			t.Fatal("fork_ref coverage must only exist when the check was requested")
-		}
+	if _, present := surfaceDone(res, model.SurfaceForkRef); present {
+		t.Fatal("fork_ref coverage must only exist when the check was requested")
 	}
 }
 
 func TestForkRefsResumeSkipsKnownPairs(t *testing.T) {
-	f := &fakeGQL{page: only("refs/heads/", "main", map[string]string{sha: "BEHIND"})}
-	gc, gdone := f.serve()
-	defer gdone()
-	_ = gc
+	g := &fakeGQL{page: one("heads/main", map[string]string{sha: "BEHIND"})}
 	k := NewKnown([]model.Finding{
 		{OldSHA: sha, Surface: model.SurfaceForkObject, Location: "b/hot", Status: model.Confirmed},
 		{OldSHA: sha, Surface: model.SurfaceForkRef, Location: "b/hot", Status: model.Confirmed},
 	}, []model.OldCommit{{SHA: sha}})
-	c, done := apiClient(forksServer(1, "b/hot"))
-	defer done()
-	c.Token = "test-token"
+	c := restAndGraphQL(t, `[{"full_name":"b/hot","pushed_at":"2026-01-01T00:00:00Z"}]`, 1, func(string) int { return 200 }, g)
 	res := Forks{Client: c, Refs: true, Known: k}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	if g.calls != 0 {
+		t.Errorf("known fork_ref pair triggered %d GraphQL calls", g.calls)
+	}
 	for _, fd := range res.Findings {
 		if fd.Surface == model.SurfaceForkRef && fd.Location == "b/hot" {
 			t.Errorf("known fork_ref pair was re-checked: %+v", fd)
 		}
+	}
+}
+
+// --- fork coverage: these are the "Ready for Support? yes on incomplete data" guards ---
+
+// forks_count undercounts in the wild (1014 reported, 1056 real). Completeness must
+// come from the listing, not the counter.
+func TestForksCoverageIgnoresUndercountedForksCount(t *testing.T) {
+	list := `[{"full_name":"a/f1"},{"full_name":"b/f2"},{"full_name":"c/f3"}]`
+	c := restAndGraphQL(t, list, 2 /* counter says 2, three exist */, func(string) int { return 422 }, nil)
+	res := Forks{Client: c, Cap: 2}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	if res.ForksTotal != 3 || res.ForksChecked != 2 {
+		t.Fatalf("checked %d of %d", res.ForksChecked, res.ForksTotal)
+	}
+	if done, _ := surfaceDone(res, model.SurfaceForkObject); done {
+		t.Error("a capped sample of 2 of 3 real forks must not be complete, whatever forks_count says")
+	}
+	// Full coverage with an undercounting counter is complete.
+	res = Forks{Client: c, Cap: 10}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	if done, _ := surfaceDone(res, model.SurfaceForkObject); !done || res.ForksIncompleteReason != "" {
+		t.Errorf("all listed forks checked: done=%v reason=%q", done, res.ForksIncompleteReason)
+	}
+}
+
+func TestForksOfForksMakeCoverageIncomplete(t *testing.T) {
+	list := `[{"full_name":"a/f1","forks_count":0},{"full_name":"b/f2","forks_count":3}]`
+	c := restAndGraphQL(t, list, 2, func(string) int { return 422 }, nil)
+	res := Forks{Client: c}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	if !strings.Contains(res.ForksIncompleteReason, "1 listed forks have forks of their own") {
+		t.Fatalf("reason=%q", res.ForksIncompleteReason)
+	}
+	if done, _ := surfaceDone(res, model.SurfaceForkObject); done {
+		t.Error("fork_object must be incomplete when a listed fork has forks")
+	}
+}
+
+func TestForkListingTruncationIsIncompleteNotSilent(t *testing.T) {
+	// Every page is full (100 forks), so the listing never ends within MaxListPages.
+	var b strings.Builder
+	b.WriteString("[")
+	for i := 0; i < 100; i++ {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `{"full_name":"u%d/r"}`, i)
+	}
+	b.WriteString("]")
+	// The same 100 names on every page: duplicates must be dropped, and the listing still truncated.
+	c := restAndGraphQL(t, b.String(), 100, func(string) int { return 422 }, nil)
+	res := Forks{Client: c, MaxListPages: 2, Cap: 1000}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	if res.ForksTotal != 100 {
+		t.Errorf("duplicate names must not inflate the count: total=%d", res.ForksTotal)
+	}
+	if !strings.Contains(res.ForksIncompleteReason, "only the first 200 forks") {
+		t.Errorf("truncated listing must say so: %q", res.ForksIncompleteReason)
 	}
 }

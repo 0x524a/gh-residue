@@ -160,8 +160,8 @@ func TestEstimateCountsForkRefQueries(t *testing.T) {
 	commits := []model.OldCommit{{SHA: a}}
 	base, _ := estimate("o/r", commits, nil, 200, true, true, false)
 	with, _ := estimate("o/r", commits, nil, 200, true, true, true)
-	if with-base != 200*2*1 { // one SHA chunk, heads and tags, per fork
-		t.Errorf("fork-refs adds %d requests, want 400", with-base)
+	if with-base != 200*1 { // one SHA chunk per fork
+		t.Errorf("fork-refs adds %d requests, want 200", with-base)
 	}
 	done := &model.Run{Coverage: model.Coverage{Surfaces: []model.SurfaceCoverage{
 		{Surface: model.SurfaceForkObject, Complete: true}, {Surface: model.SurfaceForkRef, Complete: true}}}}

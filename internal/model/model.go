@@ -54,11 +54,14 @@ type SurfaceCoverage struct {
 }
 
 type Coverage struct {
-	ProbesRun    int               `json:"probes_run"`
-	ProbesFailed int               `json:"probes_failed"`
-	ForksTotal   int               `json:"forks_total"`
-	ForksChecked int               `json:"forks_checked"`
-	Surfaces     []SurfaceCoverage `json:"surfaces"`
+	ProbesRun    int `json:"probes_run"`
+	ProbesFailed int `json:"probes_failed"`
+	ForksTotal   int `json:"forks_total"`
+	ForksChecked int `json:"forks_checked"`
+	// Why fork coverage cannot be called complete even when every listed fork was
+	// checked (truncated listing, forks of forks). Non-empty means incomplete.
+	ForksIncompleteReason string            `json:"forks_incomplete_reason,omitempty"`
+	Surfaces              []SurfaceCoverage `json:"surfaces"`
 }
 
 type Inputs struct {
@@ -101,7 +104,7 @@ func (r *Run) Sort() {
 // forks, an incomplete surface, or any finding that is not confirmed/not_found.
 // Confirmed exposures do not hide incompleteness.
 func (r *Run) Incomplete() bool {
-	if r.Coverage.ProbesFailed > 0 || r.Coverage.ForksChecked < r.Coverage.ForksTotal {
+	if r.Coverage.ProbesFailed > 0 || r.Coverage.ForksChecked < r.Coverage.ForksTotal || r.Coverage.ForksIncompleteReason != "" {
 		return true
 	}
 	for _, s := range r.Coverage.Surfaces {

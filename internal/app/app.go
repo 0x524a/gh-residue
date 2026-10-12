@@ -41,6 +41,9 @@ func Verify(ctx context.Context, repo, source, version string, commits []model.O
 		run.Coverage.Surfaces = append(run.Coverage.Surfaces, res.Surfaces...)
 		run.Coverage.ForksTotal += res.ForksTotal
 		run.Coverage.ForksChecked += res.ForksChecked
+		if res.ForksIncompleteReason != "" {
+			run.Coverage.ForksIncompleteReason = res.ForksIncompleteReason
+		}
 	}
 	if known != nil {
 		run.Findings, run.Carried = merge(run.Findings, known.Findings())

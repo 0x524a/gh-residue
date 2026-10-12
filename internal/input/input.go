@@ -46,8 +46,8 @@ func ParseSHAList(r io.Reader) ([]model.OldCommit, error) {
 // leading "old new" header). Only commits whose SHA actually changed are returned;
 // unchanged and pruned (null new SHA) entries are handled as documented below.
 // Pruned commits (new == null) were removed entirely and are still old exposure.
-// File order is preserved: filter-repo writes the map in processing order, which
-// the Support draft uses to infer the first changed commit (doc 10, item 17).
+// The order is whatever filter-repo wrote, which is sorted by old SHA, NOT
+// processing order: do not infer the first changed commit from it.
 func ParseCommitMap(r io.Reader) ([]model.OldCommit, error) {
 	var out []model.OldCommit
 	sc := bufio.NewScanner(r)
@@ -111,4 +111,39 @@ func Load(path string) ([]model.OldCommit, string, error) {
 		return c, "filter-repo", err
 	}
 	return nil, "", fmt.Errorf("no filter-repo commit-map found under %s", path)
+}
+
+// LoadFirstChanged reads filter-repo's own record of the first changed commits
+// (.git/filter-repo/first-changed-commits: "<changed commit> <undeleted ancestor>"
+// per line; the first column is what its "NOTE: First Changed Commit(s)" prints).
+// It returns nil, nil when the file does not exist, and never guesses.
+func LoadFirstChanged(dir string) ([]string, error) {
+	for _, p := range []string{
+		filepath.Join(dir, ".git", "filter-repo", "first-changed-commits"),
+		filepath.Join(dir, "filter-repo", "first-changed-commits"),
+	} {
+		f, err := os.Open(p)
+		if err != nil {
+			continue
+		}
+		defer f.Close()
+		return parseFirstChanged(f)
+	}
+	return nil, nil
+}
+
+func parseFirstChanged(r io.Reader) ([]string, error) {
+	var out []string
+	sc := bufio.NewScanner(r)
+	for n := 1; sc.Scan(); n++ {
+		f := strings.Fields(sc.Text())
+		if len(f) == 0 {
+			continue
+		}
+		if !sha40.MatchString(f[0]) {
+			return nil, fmt.Errorf("first-changed-commits line %d: %q is not a full 40-character SHA", n, f[0])
+		}
+		out = append(out, f[0])
+	}
+	return out, sc.Err()
 }

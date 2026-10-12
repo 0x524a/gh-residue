@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/0x524a/gh-residue/internal/ghapi"
@@ -12,9 +13,10 @@ import (
 )
 
 // Forks is probe 3: for a capped, prioritised sample of forks, does the old SHA
-// resolve under the fork's URL. Whether forks share one object store is still
-// unverified (doc 10, item 6), so a hit means "object resolvable", not "fork
-// holds a ref". Coverage is always disclosed (ADR-0004).
+// resolve under the fork's URL. Forks in a network share Git data (GitHub's docs,
+// "About permissions and visibility of forks"), so a hit means "object
+// resolvable", not "fork holds a ref"; Refs adds that second check. Coverage is
+// always disclosed (ADR-0004).
 type Forks struct {
 	Client       *ghapi.Client
 	Cap          int // forks to probe; 0 means 200
@@ -31,9 +33,10 @@ func (Forks) Name() string { return "forks" }
 func (p Forks) WithKnown(k *Known) Probe { p.Known = k; return p }
 
 type forkInfo struct {
-	FullName string `json:"full_name"`
-	PushedAt string `json:"pushed_at"`
-	Stars    int    `json:"stargazers_count"`
+	FullName   string `json:"full_name"`
+	PushedAt   string `json:"pushed_at"`
+	Stars      int    `json:"stargazers_count"`
+	ForksCount int    `json:"forks_count"` // this fork's own forks (cached by GitHub)
 }
 
 func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) Result {
@@ -52,10 +55,12 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 	if err != nil {
 		return p.failed(commits, "fork count: "+err.Error())
 	}
-	forks, listErr := p.list(ctx, repo, maxPages)
+	forks, listComplete, listErr := p.list(ctx, repo, maxPages)
 	if listErr != nil {
 		return p.failed(commits, "fork list: "+listErr.Error())
 	}
+	reason := incompleteReason(forks, listComplete, maxPages)
+	allForks := forks
 	sort.SliceStable(forks, func(i, j int) bool {
 		if forks[i].PushedAt != forks[j].PushedAt {
 			return forks[i].PushedAt > forks[j].PushedAt
@@ -102,18 +107,21 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 		p.checkRefs(ctx, &res, forks, commits, conc)
 	}
 
-	res.ForksTotal, res.ForksChecked = total, len(forks)
-	if res.ForksChecked > res.ForksTotal { // forks_count lags; never report >100%
-		res.ForksTotal = res.ForksChecked
-	}
+	// forks_count is a cached counter that undercounts (newren/git-filter-repo
+	// reports 1014 for 1056 real forks), so it is only a display figure and a
+	// lower bound. Completeness comes from the listing itself.
+	listed := len(allForks)
+	res.ForksTotal, res.ForksChecked = max(total, listed), len(forks)
+	res.ForksIncompleteReason = reason
+	forksDone := res.ForksChecked >= res.ForksTotal && reason == ""
 	res.Surfaces = []model.SurfaceCoverage{{
 		Surface:  model.SurfaceForkObject,
-		Complete: complete(res.Findings, model.SurfaceForkObject) && res.ForksChecked >= res.ForksTotal,
+		Complete: complete(res.Findings, model.SurfaceForkObject) && forksDone,
 	}}
 	if p.Refs {
 		res.Surfaces = append(res.Surfaces, model.SurfaceCoverage{
 			Surface:  model.SurfaceForkRef,
-			Complete: complete(res.Findings, model.SurfaceForkRef) && res.ForksChecked >= res.ForksTotal,
+			Complete: complete(res.Findings, model.SurfaceForkRef) && forksDone,
 		})
 	}
 	return res
@@ -200,26 +208,53 @@ func (p Forks) forksCount(ctx context.Context, repo string) (int, error) {
 	return v.ForksCount, nil
 }
 
-func (p Forks) list(ctx context.Context, repo string, maxPages int) ([]forkInfo, error) {
+// list returns the distinct forks GitHub lists, and whether the listing reached
+// its end (a short page). sort=oldest keeps pages stable while new forks appear;
+// duplicates from forks deleted between pages are dropped by name.
+func (p Forks) list(ctx context.Context, repo string, maxPages int) ([]forkInfo, bool, error) {
 	var all []forkInfo
+	seen := map[string]bool{}
 	for page := 1; page <= maxPages; page++ {
-		r, err := p.Client.Get(ctx, fmt.Sprintf("/repos/%s/forks?per_page=100&page=%d", repo, page))
+		r, err := p.Client.Get(ctx, fmt.Sprintf("/repos/%s/forks?per_page=100&sort=oldest&page=%d", repo, page))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if r.Status != 200 {
-			return nil, fmt.Errorf("HTTP %d", r.Status)
+			return nil, false, fmt.Errorf("HTTP %d", r.Status)
 		}
 		var batch []forkInfo
 		if err := json.Unmarshal(r.Body, &batch); err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		all = append(all, batch...)
+		for _, f := range batch {
+			if !seen[f.FullName] {
+				seen[f.FullName] = true
+				all = append(all, f)
+			}
+		}
 		if len(batch) < 100 {
-			break
+			return all, true, nil
 		}
 	}
-	return all, nil
+	return all, false, nil // last page was full: there may be more
+}
+
+// incompleteReason says why the listed forks cannot be treated as every fork.
+func incompleteReason(forks []forkInfo, listComplete bool, maxPages int) string {
+	var why []string
+	if !listComplete {
+		why = append(why, fmt.Sprintf("only the first %d forks GitHub lists were seen", maxPages*100))
+	}
+	nested := 0
+	for _, f := range forks {
+		if f.ForksCount > 0 {
+			nested++
+		}
+	}
+	if nested > 0 {
+		why = append(why, fmt.Sprintf("%d listed forks have forks of their own, which are not checked", nested))
+	}
+	return strings.Join(why, "; ")
 }
 
 func (p Forks) failed(commits []model.OldCommit, ev string) Result {

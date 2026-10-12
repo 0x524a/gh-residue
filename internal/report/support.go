@@ -12,17 +12,24 @@ import (
 
 // SupportOpts carries values the Run itself does not hold.
 type SupportOpts struct {
-	// FirstChanged is what filter-repo printed ("First Changed Commit(s)"), or
-	// the value inferred from commit-map order. Empty means unknown.
+	// FirstChanged is filter-repo's "First Changed Commit(s)": read from its
+	// first-changed-commits file or passed with --first-changed. It is never
+	// inferred (commit-map is sorted by SHA, so its order says nothing). Empty
+	// means not provided.
 	FirstChanged []string
-	Inferred     bool   // FirstChanged was inferred, not pasted from filter-repo
+	Source       string // where FirstChanged came from, shown in the draft
 	LFSFile      string // name of the LFS-orphans file, if filter-repo reported one
 }
 
 // Readiness answers "Ready for Support?". GitHub says Support acts only once no
-// non-PR refs and no forks hold references to the data. Ref-holding forks are not
-// probed yet, so "yes" is unreachable until that surface reports complete.
+// non-PR refs and no forks hold references to the data. "yes" needs: the
+// ref-holding fork check ran (--fork-refs), every fork was checked (not a sample,
+// no forks of forks, listing not truncated), nothing is unknown, and there is at
+// least one finding to speak for.
 func Readiness(r *model.Run) (answer, why string) {
+	if len(r.Findings) == 0 {
+		return "unknown", "nothing was checked"
+	}
 	forkRefDone := false
 	for _, s := range r.Coverage.Surfaces {
 		if s.Surface == model.SurfaceForkRef && s.Complete {
@@ -38,7 +45,10 @@ func Readiness(r *model.Run) (answer, why string) {
 		}
 	}
 	if !forkRefDone {
-		return "unknown", "ref-holding forks were not checked"
+		if r.Coverage.ForksIncompleteReason != "" {
+			return "unknown", "forks are not fully covered: " + r.Coverage.ForksIncompleteReason
+		}
+		return "unknown", "ref-holding forks were not fully checked (run with --fork-refs, and check every fork)"
 	}
 	if r.Incomplete() {
 		return "unknown", "some checks were incomplete"
@@ -89,13 +99,13 @@ func SupportDraft(w io.Writer, r *model.Run, o SupportOpts) {
 	fmt.Fprintf(w, "## First Changed Commit(s)\n\n")
 	switch {
 	case len(o.FirstChanged) == 0:
-		fmt.Fprintf(w, "_Not provided. Paste the `NOTE: First Changed Commit(s)` line from git-filter-repo's output._\n\n")
+		fmt.Fprintf(w, "_Not provided. Paste the `NOTE: First Changed Commit(s)` line from git-filter-repo's output, or pass `--first-changed`. gh-residue does not guess this value._\n\n")
 	default:
 		for _, s := range o.FirstChanged {
 			fmt.Fprintf(w, "- `%s`\n", s)
 		}
-		if o.Inferred {
-			fmt.Fprintf(w, "\n_Inferred from the first changed entry of `commit-map`, not taken from filter-repo's output. Verify against its `NOTE: First Changed Commit(s)` line._\n")
+		if o.Source != "" {
+			fmt.Fprintf(w, "\n_Source: %s._\n", o.Source)
 		}
 		fmt.Fprintln(w)
 	}
@@ -136,7 +146,14 @@ func SupportDraft(w io.Writer, r *model.Run, o SupportOpts) {
 		fmt.Fprintf(w, "- %s: %d\n", s, counts[model.Surface(s)])
 	}
 	if r.Coverage.ForksTotal > 0 {
-		fmt.Fprintf(w, "- Forks checked: %d of %d (object resolvable only)\n", r.Coverage.ForksChecked, r.Coverage.ForksTotal)
+		what := "object resolvable only"
+		if hasSurface(r, model.SurfaceForkRef) {
+			what = "object resolvable and ref-holding"
+		}
+		fmt.Fprintf(w, "- Forks checked: %d of %d (%s)\n", r.Coverage.ForksChecked, r.Coverage.ForksTotal, what)
+		if r.Coverage.ForksIncompleteReason != "" {
+			fmt.Fprintf(w, "- Fork coverage is incomplete: %s\n", r.Coverage.ForksIncompleteReason)
+		}
 	}
 	fmt.Fprintf(w, "\n**Ready for Support?** %s: %s.\n", ready, why)
 

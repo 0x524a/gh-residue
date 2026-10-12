@@ -210,8 +210,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 					opts.FirstChanged = append(opts.FirstChanged, c)
 				}
 			}
+			opts.Source = "passed with --first-changed"
 		} else if source == "filter-repo" {
-			opts.FirstChanged, opts.Inferred = []string{commits[0].SHA}, true
+			fc, err := input.LoadFirstChanged(*inPath)
+			if err != nil {
+				fmt.Fprintln(stderr, "first-changed-commits:", err)
+				return 2
+			}
+			opts.FirstChanged = fc
+			if len(fc) > 0 {
+				opts.Source = "read from filter-repo's first-changed-commits file"
+			}
 		}
 		f, err := os.OpenFile(*draftPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
@@ -313,8 +322,8 @@ func estimate(repo string, commits []model.OldCommit, prev *model.Run, maxForks 
 			requests += len(commits)*maxForks + 10
 		}
 		if forkRefs && !refsDone {
-			// Upper bound: per fork, 2 ref prefixes x ceil(SHAs/20) GraphQL queries (more for >100 refs).
-			requests += maxForks * 2 * ((len(commits) + 19) / 20)
+			// Upper bound: per fork, ceil(SHAs/20) GraphQL queries (more for >100 refs).
+			requests += maxForks * ((len(commits) + 19) / 20)
 		}
 	}
 	return requests, needClone
