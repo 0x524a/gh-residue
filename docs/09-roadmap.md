@@ -14,6 +14,8 @@ Nothing in M1 or later starts before M0.
 
 ## Status log
 
+- 2026-10-12: independent review (Opus) of the open questions and the fork-ref code. Found three paths to a false *Ready for Support? yes* (fork coverage judged against the undercounting `forks_count` and blind to forks of forks; ref check blind to namespaces other than heads/tags and to a fork's own pull refs) and a wrong First Changed Commit inference (`commit-map` is sorted). All fixed with tests; none shipped in a release (`--fork-refs` was unreleased; the First Changed Commit inference is in `v0.1.0`). Closed or narrowed open questions 6, 7a, 8, 15, 16, 17, 18; the Events API force-push finding (item 15) flips the earlier "unreliable" conclusion. 5 questions remain open.
+
 - 2026-10-12: ref-holding fork check implemented (`--fork-refs`): GraphQL `Ref.compare` per fork, driven by the object check, every failure path `unknown`. Checked live on 4 real forks and cross-checked against the REST compare endpoint. *Ready for Support? yes* is now reachable (needs the flag, all forks checked, nothing unknown). Open question 18 added: untestable without a second account.
 
 - 2026-10-11: Gate 0 spike repo deleted at the owner's request (open question 13 now needs a fresh throwaway repo to re-probe). Public support email set; owner reports Developer Program registration done. Developer Program criteria and the no-logo rule recorded in doc 07.

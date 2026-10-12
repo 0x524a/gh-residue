@@ -74,7 +74,7 @@ gh residue verify OWNER/REPO --input . --json > before.json
 gh residue verify OWNER/REPO --input . --against before.json
 ```
 
-The draft lists the repository, the affected pull requests, the first changed commit, the old SHAs and your current exposure. It leaves one section blank for you: why rotating the credential cannot reduce the risk. GitHub only helps when it cannot, and the tool will not make that claim for you.
+The draft lists the repository, the affected pull requests, the first changed commit (read from filter-repo's `first-changed-commits` file, or from `--first-changed`; never guessed), the old SHAs and your current exposure. It leaves one section blank for you: why rotating the credential cannot reduce the risk. GitHub only helps when it cannot, and the tool will not make that claim for you.
 
 ## What it checks
 
@@ -84,9 +84,9 @@ The draft lists the repository, the affected pull requests, the first changed co
 | Branches, tags, pull request refs | Which refs reach the SHA? | Uses a temporary mirror clone. Catches a PR merge ref that kept the old commit as a parent. |
 | Forks | Does the SHA resolve through a fork's URL? | Sampled (200 by default, `--max-forks`) and the coverage is printed. This means the object is resolvable, **not** that the fork holds a ref. |
 
-GitHub says Support acts only once no forks hold references. Add `--fork-refs` to check that: for every sampled fork that can resolve the commit, it asks GitHub whether any branch or tag in the fork contains it, including as an ancestor of later commits. Nothing is downloaded from the fork; GitHub returns only a status. It needs a token.
+GitHub says Support acts only once no forks hold references. Add `--fork-refs` to check that: for every sampled fork that can resolve the commit, it asks GitHub whether any branch, tag or other ref in the fork contains it, including as an ancestor of later commits. Nothing is downloaded from the fork; GitHub returns only a status. It needs a token.
 
-The Support draft's *Ready for Support?* line says `no` when a fork ref, branch or tag holds a commit. It says `yes` only when `--fork-refs` ran, **every** fork was checked (not a sample) and nothing is left unknown. Without `--fork-refs`, or with a sampled fork list, it says `unknown`.
+The Support draft's *Ready for Support?* line says `no` when a fork ref, branch or tag holds a commit. It says `yes` only when `--fork-refs` ran, **every** listed fork was checked (not a sample) and nothing is left unknown. Without `--fork-refs`, with a sampled fork list, with more than 1,000 forks, or when a listed fork has forks of its own (those are not checked), it says `unknown`, and the report says why. A fork that has pull requests is `unknown` too, because a fork's own pull refs are invisible to the API.
 
 ## Options
 
@@ -117,10 +117,10 @@ Reports, checkpoints and drafts list the SHAs of a leak. Do not commit them to a
 
 ## Limits
 
-- Local clones, CI caches and third-party mirrors are out of reach. Public repositories' push events may also sit in archives such as GH Archive; whether force-pushed SHAs reach them is untested.
+- Local clones, CI caches and third-party mirrors are out of reach. Public repositories' push events may also sit in archives such as GH Archive; in a sample it kept only a few of them, so its absence proves nothing, and neither it nor this tool can remove anything from it.
 - The cached web view of a commit is not probed yet.
 - CI runs the tests and a release-style build on Linux, macOS and Windows. One Windows gap remains: passing a token to git for the mirror clone goes through a `sh` helper that CI cannot exercise, because it needs an authenticated remote. On Windows, file permissions are not enforced either, so checkpoint and draft files are not restricted to your user.
-- 12 claims are still unverified and tagged **(unverified)** in [`docs/10-open-questions.md`](docs/10-open-questions.md).
+- 5 questions are still open in [`docs/10-open-questions.md`](docs/10-open-questions.md).
 
 ## Design
 

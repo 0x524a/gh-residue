@@ -43,14 +43,16 @@ Design consequence: GitHub's best-practices page (fetched 2026-10-11) says to ma
 
 Gate 0 found that GraphQL `HeadRefForcePushedEvent.beforeCommit.oid` returns the pre-rewrite head of a force-pushed PR branch (REST timeline exposes only the new head). That could seed old SHAs for PR branches in repos with no filter-repo directory. It does not cover rewrites of branches without a PR (the `main` case in Gate 0 left no trace). Treat as a v1.1 input adapter candidate; it is discoverable by anyone who can read the PR, which matters for doc 06.
 
-## Future idea: Events API discovery
+## Candidate input, not v1: Events API discovery
 
-The repo Events API documents `PushEvent.before`. Gate 0 saw no force-push events in either a private or a public test repo within minutes of the rewrite (run 2 recorded a single `PushEvent`, for a normal push). Treat the Events API as an **unreliable discovery source**; retention and any delay are **(unverified)** (doc 10, items 8 and 15).
+The repository Events API records force-pushes as `PushEvent` with `before` set to the pre-push SHA (doc 10 item 15, reviewed 2026-10-12: 25 of 25 sampled PR force-pushes). Limits: latency of 30 s to 6 h (documented), at most 300 events from the past 30 days, so a busy repository's window can be a few days. Gate 0's empty result was latency, not absence. It could seed old SHAs when no filter-repo directory exists, within that window. Like the GraphQL adapter above, anyone who can read the repository can read these events, which matters for doc 06.
 
 ## Failure behavior
 
 | Case | Result |
 |---|---|
-| No token or wrong scope | Stop early, clear message, exit 2 |
+| No token | Warn and continue: public repositories work at 60 requests/hour; a private repository is `unknown`. `--fork-refs` needs a token and exits 2 without one |
+| Wrong scope | The affected checks are `unknown`, never `not_found` |
 | Private repo the token cannot read | `unknown`, never `not_found` |
-| Fork list truncated or fork deleted mid-run | `unknown` |
+| Fork list truncated, or a listed fork has forks of its own | Fork coverage incomplete with a stated reason (`forks_incomplete_reason`); exit 2 unless something is confirmed |
+| Fork deleted mid-run | `unknown` for that fork |

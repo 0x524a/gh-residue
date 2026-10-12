@@ -49,4 +49,4 @@ Invariants that shape every doc and future code:
 
 - Claims not confirmed against official GitHub docs or an experiment are tagged **(unverified)** and tracked in `docs/10-open-questions.md`. Keep that list in sync when adding or resolving a claim; remove the tag only with evidence (cite the doc or `docs/spike/gate0-results.md`).
 - Docs are numbered 01–10; the README's doc map must stay consistent with them. Decisions go in `docs/adr/` as new numbered ADRs.
-- Gate 0 status: facts 1 (dangling SHA resolvable via REST commit endpoint) and 2 (`git clone --mirror` carries `refs/pull/*`) confirmed; fact 3 (shared fork object store) untested.
+- Gate 0 status: facts 1 (dangling SHA resolvable via REST commit endpoint) and 2 (`git clone --mirror` carries `refs/pull/*`) confirmed; fact 3 (shared fork object store) confirmed 2026-10-12 from GitHub's docs plus a live check on public forks; private and detached forks untested.

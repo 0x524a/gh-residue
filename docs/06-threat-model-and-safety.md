@@ -18,4 +18,4 @@ The user's repo and token; third-party fork owners' identities; the old SHAs the
 
 ## Honest limits (README)
 
-No purge; no secret rotation; no guarantees about archives (GH Archive **(unverified)** scope) or other people's clones.
+No purge; no secret rotation; no guarantees about archives (GH Archive is lossy: of 25 sampled public force-pushes only 2 were present, doc 10 item 7a) or other people's clones.

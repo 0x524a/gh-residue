@@ -1,27 +1,18 @@
 # 10. Open questions and unverified claims
 
-Last updated 2026-10-10. Closed items are kept (struck through) so the trail is visible.
+Last updated 2026-10-12. Closed items are kept so the trail is visible. "Reviewed" means an independent review (a separate Opus agent, 2026-10-12) reported the evidence and the maintainer did not re-run it; "verified" means the maintainer re-ran or read it.
 
 ## Open
 
 | # | Claim or question | Where | How to close |
 |---|---|---|---|
-| 6 | Fork URL resolves a parent-only SHA (shared object store) | doc 03 | Gate 0 remainder: needs a second GitHub account |
-| 7a | Whether specific force-pushes actually appear in GH Archive with the `before` SHA | doc 03 | Query a known public force-push in GH Archive or BigQuery |
-| 8 | Events API retention window for `PushEvent` (docs say a timeline of up to 300 events; the time window wasn't in the fetched text) | doc 05 | GitHub Events docs; public-repo spike run |
-| 9 | Commercial products already covering post-rewrite verification | doc 01 | Survey beyond GitHub repo search |
-| 11 | Default fork cap (200) is reasonable (concurrency is now 1 per GitHub's best-practices page) | doc 05 | Tune after M1 |
+| 9 | Do commercial products already cover post-rewrite verification? Positioning only: no design decision depends on the answer | doc 01 | Survey beyond GitHub repo search, if wanted for the README |
+| 11 | What request budget is right? The real coverage limits are the hard cap of 1000 listed forks and forks of forks (both now reported as incomplete coverage), not the 200-fork sample size | doc 05 | Use the tool on a few large repos and tune the default sample and the page cap |
 | 12 | Formal trademark clearance for the name | doc 07 | Separate legal step, if desired |
-| 13 | How long `refs/pull/N/merge` keeps the old commit after a PR-branch force-push (seen about 1 minute) | doc 03 | Repeat the Gate 0 scenario in a new throwaway repo and poll `refs/pull/N/merge` over time (the original spike repo was deleted 2026-10-11); GitHub docs |
-| 14 | ~~Web commit view status for a dangling SHA on a public repo~~ | docs 03, ADR-0005 | **Closed 2026-10-10:** HTTP 200 for both rewritten commits (spike run 2). Still opt-in per doc 07 |
-| 15 | Whether the Events API records force-pushes as `PushEvent` (run 2: it did not, within minutes, for either rewrite) | doc 05 | Re-check after some hours; treat as unreliable meanwhile |
-| 16 | GraphQL `beforeCommit` documentation and retention for old-SHA discovery (works in Gate 0; not in the fetched reference page) | doc 05 | GraphQL docs in a browser; test on older PRs |
-| 17 | Whether a `git-filter-repo` `commit-map` reliably yields the same "First Changed Commit(s)" value filter-repo prints | doc 04 | Compare on a test rewrite |
-| 18 | `Ref.compare(headRef: <parent-only sha>)` on a fork returns a usable status when the object store is not shared, and the behaviour for a fork that has the SHA only through the parent | doc 03 | Needs a second account (same blocker as item 6) |
+| 13 | How long `refs/pull/N/merge` keeps the old commit after a PR-branch force-push. Gate 0 saw about 1 minute. Reviewed: on 19 of 19 open PRs force-pushed 2026-09-14 to 2026-10-11 the merge ref no longer contained the old head, so the lifetime is between about 1 minute and about 15 hours. The sharper question is whether a **closed** PR's merge ref can keep the old commit indefinitely | doc 03 | Force-push a PR branch in a new throwaway repo and poll `ls-remote` for an hour; repeat with the PR closed right after the force-push |
+| 19 | Does the shared Git data between forks also hold for forks of private repositories and for detached forks? Verified only for public networks | doc 03 | Needs private repositories in two accounts, or a detached fork |
 
 ## Closed
-
-_Item 10 (licence) closed 2026-10-11: owner chose Apache-2.0._
 
 | # | Question | Resolution |
 |---|---|---|
@@ -30,4 +21,13 @@ _Item 10 (licence) closed 2026-10-11: owner chose Apache-2.0._
 | 3 | ~~Terms on automated access~~ | **Closed 2026-10-10** (read, not legal advice). API use under ToS section H; web access counts as scraping under the AUP. Probe 5 stays opt-in. See doc 07 |
 | 4 | ~~Dangling SHA resolves via REST commit endpoint~~ | Confirmed, Gate 0 |
 | 5 | ~~`git clone --mirror` carries `refs/pull/*`~~ | Confirmed, Gate 0 |
-| 7 | ~~GH Archive retains push events~~ | **Mostly closed 2026-10-10.** Public timeline archived since 2015; `PushEvent.before` documented. Specific force-push presence moved to 7a |
+| 6 | ~~Fork URL resolves a parent-only SHA (shared object store)~~ | **Closed 2026-10-12, verified.** GitHub's "About permissions and visibility of forks" says: "Git data from any repository in a network may be accessed from any repository in the same network, including the upstream repository, even after a fork is deleted." Live: `bollwarm/git-filter-repo` (last pushed 2019, its `master` 364 commits behind) resolves the upstream's current tip through its own URL. Public networks only: see item 19 |
+| 7 | ~~GH Archive retains push events~~ | **Closed 2026-10-12.** Public timeline archived since 2015; `PushEvent.before` documented |
+| 7a | ~~Do specific force-pushes appear in GH Archive with the `before` SHA?~~ | **Closed 2026-10-12, reviewed.** Of 25 known public force-pushes, 2 are present with the correct `before`. For the other 23 the repository has no events of any kind in that hour, so the archive drops events generally; it does not filter force-pushes. Treat the archive as lossy: its absence proves nothing. `PushEvent` payloads carry only `before`, `head`, `push_id`, `ref`, `repository_id` |
+| 8 | ~~Events API retention for `PushEvent`~~ | **Closed 2026-10-12.** Latency "anywhere from 30s to 6h" (verified, docs). Reviewed: the timeline holds up to 300 events from the past 30 days, so on a busy repository the 300 cap is the real limit (cli/cli's feed covered about 3 days) |
+| 10 | ~~Licence~~ | **Closed 2026-10-11:** owner chose Apache-2.0 |
+| 14 | ~~Web commit view status for a dangling SHA on a public repo~~ | **Closed 2026-10-10:** HTTP 200 for both rewritten commits (spike run 2). Still opt-in per doc 07 |
+| 15 | ~~Does the Events API record force-pushes as `PushEvent`?~~ | **Closed 2026-10-12, reviewed. The earlier answer flips.** 25 of 25 PR force-pushes in cli/cli and golang/go appear in the head fork's repository events as a `PushEvent` with `before` set to the pre-push SHA. Gate 0 saw nothing within minutes because of the documented 30 s to 6 h latency. This reopens event-based discovery of old SHAs as an input adapter (doc 05) |
+| 16 | ~~GraphQL `beforeCommit` documentation and retention~~ | **Closed 2026-10-12, verified.** The schema documents `HeadRefForcePushedEvent.beforeCommit`: "Identifies the before commit SHA for the 'head_ref_force_pushed' event." Reviewed: non-null on 8 of 8 events in cli/cli's first 60 PRs (oldest 2019-10) |
+| 17 | ~~Does `commit-map` yield filter-repo's "First Changed Commit(s)"?~~ | **Closed 2026-10-12, verified. No.** `git-filter-repo` writes `commit-map` sorted by old SHA (`sorted(commit_renames.items())`), so its order says nothing about which commit changed first. It records the answer itself in `.git/filter-repo/first-changed-commits` (`<changed commit> <undeleted ancestor>` per line); the "NOTE: First Changed Commit(s)" line prints the first column. The tool now reads that file and otherwise asks for `--first-changed`; it no longer infers. Unverified: whether filter-repo versions older than the one checked (2.47) write that file |
+| 18 | ~~Does `Ref.compare(headRef: <sha>)` give a usable answer on a fork?~~ | **Closed 2026-10-12.** A SHA the fork cannot resolve gets REST 422 and never reaches GraphQL, and item 6 shows forks resolve parent-only SHAs, so compare is usable. Verified: statuses on `octocat/Hello-World`, and agreement with the REST compare endpoint on 9 branch pairs in 4 real forks (5 ancestor-only). Reviewed: annotated tags are peeled correctly, an unrelated-history branch gives `DIVERGED`. GraphQL's `refs(refPrefix:"refs/")` returns every non-pull ref; a fork's own `refs/pull/*` is invisible to it, which is why a fork with pull requests is reported `unknown` |

@@ -12,7 +12,7 @@ Every probe answers: is old SHA X still reachable via surface Y? Any error, time
 
 ## Caveats
 
-- **Forks share one object store (unverified).** A hit on a fork's commit URL means the object exists in the network, not that the fork holds a ref to it. The report separates *object resolvable* (cheap) from *ref-holding* (`--fork-refs`, opt-in, below).
+- **Forks share Git data (verified 2026-10-12, doc 10 item 6).** A hit on a fork's commit URL means the object exists in the network, not that the fork holds a ref to it. The report separates *object resolvable* (cheap) from *ref-holding* (`--fork-refs`, opt-in, below).
 - **Large networks.** Repos can have thousands of forks. Default cap 200 (tunable), prioritized by recent push activity and stars. Output always prints coverage ("checked 200 of 4,312 forks"). See ADR-0004.
 - **Probe 2 costs a clone.** Warn on large repos; use a temp dir with restrictive permissions, always deleted, including on error.
 - **Probe 5 is automated access to web pages.** Off by default until GitHub's terms on automated access are reviewed (doc 07).
@@ -32,11 +32,19 @@ GitHub's page says Support acts only once no forks hold references to the sensit
 Per (fork, old SHA), in order:
 
 1. The object check above. If the SHA is **not resolvable** through the fork, no ref in that fork can hold it: `not_found`. If that check is `unknown`, the ref check is `unknown`.
-2. If resolvable, one GraphQL query per fork (heads and tags, 100 refs a page, up to 5 pages each, 20 SHAs per query) calls `Ref.compare(headRef: <sha>)` on each ref. `IDENTICAL` or `BEHIND` means the ref contains the SHA; `AHEAD` or `DIVERGED` means it does not.
-3. Any error, null compare, unexpected status, missing repository or truncated ref list is `unknown`. A ref already proven to hold the SHA stands even if a later page fails.
+2. If resolvable, GraphQL queries per fork (every ref except `refs/pull/*`, via `refPrefix:"refs/"`, 100 refs a page, up to 10 pages, 20 SHAs per query) call `Ref.compare(headRef: <sha>)` on each ref. `IDENTICAL` or `BEHIND` means the ref contains the SHA; `AHEAD` or `DIVERGED` means it does not. Heads, tags and unusual namespaces (`refs/notes/*`, `refs/remotes/*`, `refs/original/*`) are all covered.
+3. A fork's own `refs/pull/*` are invisible to GraphQL, so a fork with any pull requests is `unknown` unless a holder was already proven.
+4. Any error, null compare, unexpected status, missing repository or truncated ref list is `unknown`. A ref already proven to hold the SHA stands even if a later page fails.
 
 Why not `git ls-remote`: it lists tips only, so a fork branch with the old commit buried under later commits would be missed, and `not_found` would be a false all-clear. Why not fetching the fork: it would download another person's content (see "Caveats"). `Ref.compare` returns a status and nothing else.
 
 Verified 2026-10-12: statuses and semantics on `octocat/Hello-World`; an opaque `Something went wrong` error for an unresolvable SHA (so it cannot be distinguished from a transient fault); and, for 4 real forks, agreement with the REST compare endpoint on all 9 branch pairs checked, 5 of which were ancestor-only (the case `ls-remote` cannot see). **Not verified:** that GraphQL compare works for a SHA that exists only in the parent on a fork with a non-shared object store (open question 6 still blocks that, because it needs a second account).
 
-"Ready for Support? yes" needs: `--fork-refs` ran, every fork was checked (not sampled, ADR-0004), and nothing is `unknown`.
+### Fork coverage and "Ready for Support? yes"
+
+Coverage is judged from the fork **listing**, not from `forks_count`, which is a cached counter that undercounts (1014 reported, 1056 real forks on `newren/git-filter-repo`). The listing is deduplicated by name and uses `sort=oldest` so pages stay stable while forks are created. Fork coverage is recorded as incomplete, with a stated reason in `forks_incomplete_reason`, when:
+
+- the listing did not end on a short page (only the first 1000 forks were seen), or
+- a listed fork has forks of its own (`forks_count` > 0 on that fork). Forks of forks are not enumerated.
+
+A sample smaller than the list (`--max-forks`) is incomplete too. "Ready for Support? yes" needs: `--fork-refs` ran, every listed fork was checked, none of the reasons above applies, nothing is `unknown`, and there is at least one finding. It still rests on GitHub's own counters: a fork-of-a-fork created moments ago that the cached counts do not yet show would be missed.

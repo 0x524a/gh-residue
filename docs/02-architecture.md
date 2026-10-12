@@ -12,7 +12,7 @@ inputs  ->  probe engine  ->  reporters
 
 Each yields `[]OldCommit{sha, newSha?}`.
 
-- `filter-repo` directory: reads `.git/filter-repo/commit-map` (old to new SHA) and `changed-refs`.
+- `filter-repo` directory: reads `.git/filter-repo/commit-map` (old to new SHA; sorted by old SHA, so its order carries no meaning). `first-changed-commits` is read only for the Support draft. `changed-refs` is not read yet.
 - SHA list: one full 40-char SHA per line. Used for BFG, manual rewrites, or a `git push --mirror` log.
 
 Short SHAs are rejected; ambiguity would hide findings.

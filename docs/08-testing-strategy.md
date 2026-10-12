@@ -2,7 +2,7 @@
 
 ## Gate 0 status (2026-10-10)
 
-Facts 1 and 2 confirmed (private repo), and a public-repo run done (web view confirmed, Events API unreliable). Fact 3 (fork object store) is **not tested**: it needs a second account, which the owner does not have. GitHub's ToS permits one free machine account in addition to a personal account, a possible route. Results: [`spike/gate0-results.md`](spike/gate0-results.md). Both throwaway repos have been deleted (the private one on 2026-10-11).
+Facts 1 and 2 confirmed (private repo), and a public-repo run done (web view confirmed, Events API unreliable). Fact 3 (fork object store) was left untested at the time for want of a second account; it was closed on 2026-10-12 from GitHub's documentation and a live check (doc 10 item 6). Results: [`spike/gate0-results.md`](spike/gate0-results.md). Both throwaway repos have been deleted (the private one on 2026-10-11).
 
 ## Gate 0: empirical spike (before any code)
 
@@ -19,7 +19,7 @@ It must validate three facts the design depends on:
 2. `git clone --mirror` carries `refs/pull/*`.
 3. A fork's URL resolves a SHA that only the parent holds.
 
-Claims that Gate 0 has not confirmed stay tagged **(unverified)**; currently that is fact 3 only. If any fails, doc 03 is revised before implementation.
+Claims that Gate 0 has not confirmed stay tagged **(unverified)**. Fact 3 was closed on 2026-10-12 from GitHub's own documentation plus a live check on a public network (doc 10 item 6); only private and detached forks remain untested (item 19). If any fails, doc 03 is revised before implementation.
 
 ## Test layers (after Gate 0)
 

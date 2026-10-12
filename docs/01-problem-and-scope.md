@@ -22,7 +22,7 @@ Primary: both of the following, single-repo first.
 ## Scope (v1)
 
 - One repo per run. Core is a library so org mode is a loop (see doc 05).
-- Inputs: a `git-filter-repo` working directory (`commit-map`, `changed-refs`), or a plain list of old SHAs.
+- Inputs: a `git-filter-repo` working directory (`commit-map` and `first-changed-commits`), or a plain list of old SHAs.
 - Outputs: human table, stable JSON, Support-request draft, diff against an earlier run.
 - Read-only. GitHub only.
 
