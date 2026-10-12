@@ -125,7 +125,9 @@ The reasoning and the evidence behind it are in [`docs/`](docs/): [problem and s
 
 ## Support
 
-Open an [issue](https://github.com/0x524a/gh-residue/issues). Include the command, the exit code and the version from `gh residue --version`; leave out SHAs and any secret.
+Open an [issue](https://github.com/0x524a/gh-residue/issues) for bugs and questions. Include the command, the exit code and the version from `gh residue --version`; leave out SHAs and any secret.
+
+For anything that does not belong in a public issue, email [0x524a@gmail.com](mailto:0x524a@gmail.com). Do not send SHAs of a live leak or any credential there either.
 
 gh-residue uses the GitHub REST API and is not affiliated with or endorsed by GitHub. The `gh-` prefix is the naming convention for CLI extensions.
 
