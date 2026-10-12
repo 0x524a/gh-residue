@@ -26,7 +26,7 @@ import (
 // version is the release line; bump it with each tag. The commit is appended at
 // runtime from Go's VCS build info, so no -ldflags are needed (the extension
 // release action only takes plain go build options).
-const baseVersion = "0.1.0"
+const baseVersion = "0.2.0"
 
 var version = buildVersion(baseVersion)
 
@@ -148,7 +148,23 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	client := ghapi.New(token)
 
-	est, needClone := estimate(repo, commits, prevCheckpoint, *maxForks, !*noMirror, !*noForks, *forkRefs)
+	draftFirst, draftSrc, err := firstChangedCommits(*inPath, source, *firstChanged)
+	if err != nil {
+		fmt.Fprintln(stderr, "warning: first-changed-commits:", err, "(fork checks will cover every commit)")
+	}
+	// Every rewritten commit descends from a first changed commit, so a fork ref
+	// holding any of them holds one of these. Used only when all are in the input.
+	var anchors []string
+	forkScope := commits
+	if sub := anchorCommits(commits, draftFirst); sub != nil && len(sub) < len(commits) {
+		forkScope = sub
+		for _, c := range sub {
+			anchors = append(anchors, c.SHA)
+		}
+		fmt.Fprintf(stderr, "note: forks are checked for the %d first changed commit(s) (%s), not all %d rewritten commits\n", len(sub), draftSrc, len(commits))
+	}
+
+	est, needClone := estimate(repo, commits, forkScope, prevCheckpoint, *maxForks, !*noMirror, !*noForks, *forkRefs)
 	probes := []probe.Probe{probe.BaseObject{Client: client}}
 	if !*noMirror {
 		probes = append(probes, probe.Mirror{CloneURL: "https://github.com/" + repo + ".git", Token: token})
@@ -159,7 +175,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		probes = append(probes, probe.Skipped{Label: "mirror", Surfaces: []model.Surface{model.SurfaceBranch, model.SurfacePRRef, model.SurfaceTag}})
 	}
 	if !*noForks {
-		probes = append(probes, probe.Forks{Client: client, Cap: *maxForks, Concurrency: *concurrency, Refs: *forkRefs})
+		probes = append(probes, probe.Forks{Client: client, Cap: *maxForks, Concurrency: *concurrency, Refs: *forkRefs, Anchors: anchors})
 	} else {
 		probes = append(probes, probe.Skipped{Label: "forks", Surfaces: []model.Surface{model.SurfaceForkObject}})
 	}
@@ -203,25 +219,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if *draftPath != "" {
-		opts := report.SupportOpts{LFSFile: *lfsFile}
-		if *firstChanged != "" {
-			for _, c := range strings.Split(*firstChanged, ",") {
-				if c = strings.TrimSpace(c); c != "" {
-					opts.FirstChanged = append(opts.FirstChanged, c)
-				}
-			}
-			opts.Source = "passed with --first-changed"
-		} else if source == "filter-repo" {
-			fc, err := input.LoadFirstChanged(*inPath)
-			if err != nil {
-				fmt.Fprintln(stderr, "first-changed-commits:", err)
-				return 2
-			}
-			opts.FirstChanged = fc
-			if len(fc) > 0 {
-				opts.Source = "read from filter-repo's first-changed-commits file"
-			}
-		}
+		opts := report.SupportOpts{LFSFile: *lfsFile, FirstChanged: draftFirst, Source: draftSrc}
 		f, err := os.OpenFile(*draftPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
 			fmt.Fprintln(stderr, "support-draft:", err)
@@ -288,7 +286,7 @@ func writeCheckpoint(path string, r *model.Run) error {
 
 // estimate returns an upper bound on API requests and whether a clone is needed.
 // Results already known from a checkpoint are not counted: they are not re-requested.
-func estimate(repo string, commits []model.OldCommit, prev *model.Run, maxForks int, mirror, forks, forkRefs bool) (requests int, needClone bool) {
+func estimate(repo string, commits, forkCommits []model.OldCommit, prev *model.Run, maxForks int, mirror, forks, forkRefs bool) (requests int, needClone bool) {
 	var known *probe.Known
 	var forksDone, refsDone bool
 	if prev != nil {
@@ -319,12 +317,56 @@ func estimate(repo string, commits []model.OldCommit, prev *model.Run, maxForks 
 		if forksDone {
 			requests += 10 // fork list pages only; every fork/SHA pair is already known
 		} else {
-			requests += len(commits)*maxForks + 10
+			requests += len(forkCommits)*maxForks + 10
 		}
 		if forkRefs && !refsDone {
 			// Upper bound: per fork, ceil(SHAs/20) GraphQL queries (more for >100 refs).
-			requests += maxForks * ((len(commits) + 19) / 20)
+			requests += maxForks * ((len(forkCommits) + 19) / 20)
 		}
 	}
 	return requests, needClone
+}
+
+// firstChangedCommits returns the first changed commits and where they came from:
+// --first-changed wins, else filter-repo's own file. It never infers them.
+func firstChangedCommits(inPath, source, flagValue string) ([]string, string, error) {
+	if flagValue != "" {
+		var out []string
+		for _, c := range strings.Split(flagValue, ",") {
+			if c = strings.TrimSpace(c); c != "" {
+				out = append(out, c)
+			}
+		}
+		return out, "passed with --first-changed", nil
+	}
+	if source != "filter-repo" {
+		return nil, "", nil
+	}
+	fc, err := input.LoadFirstChanged(inPath)
+	if err != nil || len(fc) == 0 {
+		return nil, "", err
+	}
+	return fc, "read from filter-repo's first-changed-commits file", nil
+}
+
+// anchorCommits returns the input commits that are first changed commits, or nil
+// unless every first changed commit is among them.
+func anchorCommits(commits []model.OldCommit, first []string) []model.OldCommit {
+	if len(first) == 0 {
+		return nil
+	}
+	want := map[string]bool{}
+	for _, f := range first {
+		want[f] = true
+	}
+	var out []model.OldCommit
+	for _, c := range commits {
+		if want[c.SHA] {
+			out = append(out, c)
+		}
+	}
+	if len(out) != len(want) {
+		return nil
+	}
+	return out
 }

@@ -26,6 +26,12 @@ type Forks struct {
 	// Refs also asks, for each fork that can resolve an old SHA, whether any branch
 	// or tag in it contains the SHA. Needs a token (GraphQL). Opt-in.
 	Refs bool
+	// Anchors are filter-repo's first changed commits. Every rewritten commit has
+	// one as an ancestor, and a ref that contains a commit contains all its
+	// ancestors, so a fork that holds any rewritten commit also holds an anchor.
+	// When set, fork checks run for the anchors only and the other commits are
+	// not requested per fork (forks x commits would be millions of calls).
+	Anchors []string
 }
 
 func (Forks) Name() string { return "forks" }
@@ -51,6 +57,8 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 		maxPages = 10
 	}
 
+	all := commits
+	commits = p.forkScope(commits)
 	total, err := p.forksCount(ctx, repo)
 	if err != nil {
 		return p.failed(commits, "fork count: "+err.Error())
@@ -113,6 +121,7 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 	listed := len(allForks)
 	res.ForksTotal, res.ForksChecked = max(total, listed), len(forks)
 	res.ForksIncompleteReason = reason
+	res.ForkCommitsSkipped = len(all) - len(commits)
 	forksDone := res.ForksChecked >= res.ForksTotal && reason == ""
 	res.Surfaces = []model.SurfaceCoverage{{
 		Surface:  model.SurfaceForkObject,
@@ -189,6 +198,29 @@ func (p Forks) checkRefs(ctx context.Context, res *Result, forks []forkInfo, com
 	}
 	close(jobs)
 	wg.Wait()
+}
+
+// forkScope narrows the commits to check on forks to the anchors, but only when
+// every anchor is one of the commits; otherwise the inference is unsafe and all
+// commits are checked.
+func (p Forks) forkScope(commits []model.OldCommit) []model.OldCommit {
+	if len(p.Anchors) == 0 {
+		return commits
+	}
+	want := map[string]bool{}
+	for _, a := range p.Anchors {
+		want[a] = true
+	}
+	var out []model.OldCommit
+	for _, c := range commits {
+		if want[c.SHA] {
+			out = append(out, c)
+		}
+	}
+	if len(out) != len(want) {
+		return commits
+	}
+	return out
 }
 
 func (p Forks) forksCount(ctx context.Context, repo string) (int, error) {

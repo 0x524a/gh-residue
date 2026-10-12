@@ -26,7 +26,7 @@ Confirmed against docs.github.com "Rate limits for the REST API" (fetched 2026-1
 
 Design consequence: GitHub's best-practices page (fetched 2026-10-11) says to make requests **serially** to avoid secondary limits, so default concurrency is **1** (`--concurrency N` to opt in). CPU-time limits are not observable, so higher values are the user's risk. Rate-limit handling follows the same page: `retry-after`, then `x-ratelimit-reset`; a plain 403/429 with neither header is reported `unknown` rather than retried after a minute (stricter than the page, never a false clear).
 
-- Up-front estimate: SHAs x (1 base + N forks), printed before starting; above a threshold require `--yes`.
+- Up-front estimate: base checks for every SHA, plus (first changed commits x forks) when filter-repo's `first-changed-commits` is available, else (all SHAs x forks); printed before starting; above a threshold require `--yes`. Fork checks use the first changed commits because every rewritten commit descends from one and a ref holding a commit holds its ancestors (checked on a two-leak rewrite with git-filter-repo).
 - Fork probing is the expensive part: capped (default 200) and prioritized by recent push and stars.
 - Honor `Retry-After` and `X-RateLimit-Reset`. Default concurrency 1. Use `ETag` conditional requests on re-runs where supported.
 - Budget exhausted mid-run: remaining checks become `unknown`, exit code 2.

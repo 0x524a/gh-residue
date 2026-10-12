@@ -126,7 +126,7 @@ func TestEstimateSubtractsCheckpointedWork(t *testing.T) {
 	const b = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	commits := []model.OldCommit{{SHA: a}, {SHA: b}}
 
-	if n, clone := estimate("o/r", commits, nil, 200, true, true, false); n != 2+2*200+10 || !clone {
+	if n, clone := estimate("o/r", commits, commits, nil, 200, true, true, false); n != 2+2*200+10 || !clone {
 		t.Errorf("fresh run: %d clone=%v", n, clone)
 	}
 
@@ -138,7 +138,7 @@ func TestEstimateSubtractsCheckpointedWork(t *testing.T) {
 		{OldSHA: a, Surface: model.SurfaceTag, Location: "*", Status: model.NotFound},
 	}, Coverage: model.Coverage{Surfaces: []model.SurfaceCoverage{{Surface: model.SurfaceForkObject, Complete: true}}}}
 	// b has no known ref surfaces, so a clone is still needed; forks fully done.
-	if n, clone := estimate("o/r", commits, prev, 200, true, true, false); n != 1+10 || !clone {
+	if n, clone := estimate("o/r", commits, commits, prev, 200, true, true, false); n != 1+10 || !clone {
 		t.Errorf("partial resume: %d clone=%v", n, clone)
 	}
 	// Everything known: nothing to request, no clone.
@@ -146,11 +146,11 @@ func TestEstimateSubtractsCheckpointedWork(t *testing.T) {
 		prev.Findings = append(prev.Findings, model.Finding{OldSHA: b, Surface: s, Location: "*", Status: model.NotFound})
 	}
 	prev.Findings[1].Status = model.NotFound
-	if n, clone := estimate("o/r", commits, prev, 200, true, false, false); n != 0 || clone {
+	if n, clone := estimate("o/r", commits, commits, prev, 200, true, false, false); n != 0 || clone {
 		t.Errorf("all known: %d clone=%v", n, clone)
 	}
 	// Skipped mirror never needs a clone.
-	if _, clone := estimate("o/r", commits, nil, 200, false, false, false); clone {
+	if _, clone := estimate("o/r", commits, commits, nil, 200, false, false, false); clone {
 		t.Error("--no-mirror must not report a clone")
 	}
 }
@@ -158,14 +158,14 @@ func TestEstimateSubtractsCheckpointedWork(t *testing.T) {
 func TestEstimateCountsForkRefQueries(t *testing.T) {
 	const a = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	commits := []model.OldCommit{{SHA: a}}
-	base, _ := estimate("o/r", commits, nil, 200, true, true, false)
-	with, _ := estimate("o/r", commits, nil, 200, true, true, true)
+	base, _ := estimate("o/r", commits, commits, nil, 200, true, true, false)
+	with, _ := estimate("o/r", commits, commits, nil, 200, true, true, true)
 	if with-base != 200*1 { // one SHA chunk per fork
 		t.Errorf("fork-refs adds %d requests, want 200", with-base)
 	}
 	done := &model.Run{Coverage: model.Coverage{Surfaces: []model.SurfaceCoverage{
 		{Surface: model.SurfaceForkObject, Complete: true}, {Surface: model.SurfaceForkRef, Complete: true}}}}
-	if n, _ := estimate("o/r", commits, done, 200, true, true, true); n > 11 {
+	if n, _ := estimate("o/r", commits, commits, done, 200, true, true, true); n > 11 {
 		t.Errorf("a completed fork_ref checkpoint should add no queries, got ~%d", n)
 	}
 }
@@ -177,5 +177,19 @@ func TestForkRefsFlagGuards(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := run([]string{"verify", "o/r", "--input", f, "--fork-refs", "--no-forks"}, &out, &errb); code != 2 || !strings.Contains(errb.String(), "--no-forks") {
 		t.Errorf("exit %d: %s", code, errb.String())
+	}
+}
+
+func TestAnchorCommits(t *testing.T) {
+	a, b, c := strings.Repeat("a", 40), strings.Repeat("b", 40), strings.Repeat("c", 40)
+	commits := []model.OldCommit{{SHA: a}, {SHA: b}, {SHA: c}}
+	if got := anchorCommits(commits, []string{b}); len(got) != 1 || got[0].SHA != b {
+		t.Fatalf("%+v", got)
+	}
+	if anchorCommits(commits, []string{b, strings.Repeat("d", 40)}) != nil {
+		t.Fatal("an anchor missing from the input must disable narrowing")
+	}
+	if anchorCommits(commits, nil) != nil {
+		t.Fatal("no anchors, no narrowing")
 	}
 }

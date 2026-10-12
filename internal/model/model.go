@@ -60,8 +60,10 @@ type Coverage struct {
 	ForksChecked int `json:"forks_checked"`
 	// Why fork coverage cannot be called complete even when every listed fork was
 	// checked (truncated listing, forks of forks). Non-empty means incomplete.
-	ForksIncompleteReason string            `json:"forks_incomplete_reason,omitempty"`
-	Surfaces              []SurfaceCoverage `json:"surfaces"`
+	ForksIncompleteReason string `json:"forks_incomplete_reason,omitempty"`
+	// Commits not requested per fork: covered through the first changed commits.
+	ForkCommitsSkipped int               `json:"fork_commits_skipped,omitempty"`
+	Surfaces           []SurfaceCoverage `json:"surfaces"`
 }
 
 type Inputs struct {

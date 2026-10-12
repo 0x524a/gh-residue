@@ -107,3 +107,13 @@ func TestTableWordingWhenForkRefsChecked(t *testing.T) {
 		t.Errorf("must not list ref-holding forks as not probed when they were:\n%s", out)
 	}
 }
+
+func TestTableDisclosesForkAnchorScope(t *testing.T) {
+	r := sample()
+	r.Coverage.ForkCommitsSkipped = 40
+	var b bytes.Buffer
+	Table(&b, r)
+	if !strings.Contains(b.String(), "first changed commits only; 40 other commits were not checked one by one") {
+		t.Fatalf("scope not disclosed:\n%s", b.String())
+	}
+}

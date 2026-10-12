@@ -17,7 +17,9 @@ type Result struct {
 	ForksChecked int
 	// Set when listed forks cannot be taken as all forks: see model.Coverage.
 	ForksIncompleteReason string
-	Failed                bool // the probe could not run at all
+	// Commits not individually checked on fork surfaces (covered via anchors).
+	ForkCommitsSkipped int
+	Failed             bool // the probe could not run at all
 }
 
 type Probe interface {

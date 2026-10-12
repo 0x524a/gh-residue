@@ -72,6 +72,9 @@ func Table(w io.Writer, r *model.Run) {
 		if r.Coverage.ForksIncompleteReason != "" {
 			fmt.Fprintf(w, "Fork coverage is incomplete: %s.\n", r.Coverage.ForksIncompleteReason)
 		}
+		if n := r.Coverage.ForkCommitsSkipped; n > 0 {
+			fmt.Fprintf(w, "Forks were checked for the first changed commits only; %s not checked one by one. A ref that holds any rewritten commit also holds a first changed commit.\n", plural(n, "other commit was", "other commits were"))
+		}
 	}
 	var inc []string
 	for _, s := range r.Coverage.Surfaces {

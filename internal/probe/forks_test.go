@@ -75,3 +75,43 @@ func TestForksListFailureIsUnknown(t *testing.T) {
 		t.Fatalf("%+v", res)
 	}
 }
+
+func TestForksAnchorsLimitPerForkRequests(t *testing.T) {
+	anchor := strings.Repeat("a", 40)
+	var others []model.OldCommit
+	for i := 0; i < 50; i++ {
+		others = append(others, model.OldCommit{SHA: fmt.Sprintf("%040x", i+1)})
+	}
+	commits := append([]model.OldCommit{{SHA: anchor}}, others...)
+	hits := 0
+	h := forksServer(3, "nobody")
+	c, done := apiClient(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/commits/") {
+			hits++
+		}
+		h(w, r)
+	})
+	defer done()
+	res := Forks{Client: c, Anchors: []string{anchor}}.Run(context.Background(), "o/r", commits)
+	if hits != 3 {
+		t.Fatalf("want one request per fork for the anchor, got %d", hits)
+	}
+	if res.ForkCommitsSkipped != 50 {
+		t.Fatalf("skipped %d", res.ForkCommitsSkipped)
+	}
+	for _, f := range res.Findings {
+		if f.OldSHA != anchor {
+			t.Fatalf("non-anchor finding %+v", f)
+		}
+	}
+}
+
+func TestForksAnchorNotInCommitsFallsBackToAll(t *testing.T) {
+	c, done := apiClient(forksServer(3, "nobody"))
+	defer done()
+	res := Forks{Client: c, Anchors: []string{strings.Repeat("b", 40)}}.Run(context.Background(), "o/r",
+		[]model.OldCommit{{SHA: sha}})
+	if res.ForkCommitsSkipped != 0 || len(res.Findings) != 3 {
+		t.Fatalf("%d skipped, %d findings", res.ForkCommitsSkipped, len(res.Findings))
+	}
+}
