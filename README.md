@@ -129,6 +129,8 @@ Open an [issue](https://github.com/0x524a/gh-residue/issues) for bugs and questi
 
 For anything that does not belong in a public issue, email [0x524a@gmail.com](mailto:0x524a@gmail.com). Do not send SHAs of a live leak or any credential there either.
 
+To report a security problem, including any way the tool could report a failed check as clean, follow the [security policy](SECURITY.md) and use GitHub's private reporting.
+
 gh-residue uses the GitHub REST API and is not affiliated with or endorsed by GitHub. The `gh-` prefix is the naming convention for CLI extensions.
 
 ## License
