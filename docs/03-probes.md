@@ -12,7 +12,7 @@ Every probe answers: is old SHA X still reachable via surface Y? Any error, time
 
 ## Caveats
 
-- **Forks share one object store (unverified).** A hit on a fork's commit URL means the object exists in the network, not that the fork holds a ref to it. The report separates *object resolvable* (cheap) from *ref-holding* (one `ls-remote` per fork; opt-in).
+- **Forks share one object store (unverified).** A hit on a fork's commit URL means the object exists in the network, not that the fork holds a ref to it. The report separates *object resolvable* (cheap) from *ref-holding* (`--fork-refs`, opt-in, below).
 - **Large networks.** Repos can have thousands of forks. Default cap 200 (tunable), prioritized by recent push activity and stars. Output always prints coverage ("checked 200 of 4,312 forks"). See ADR-0004.
 - **Probe 2 costs a clone.** Warn on large repos; use a temp dir with restrictive permissions, always deleted, including on error.
 - **Probe 5 is automated access to web pages.** Off by default until GitHub's terms on automated access are reviewed (doc 07).
@@ -25,4 +25,18 @@ Every probe answers: is old SHA X still reachable via surface Y? Any error, time
 
 ## Support precondition and the fork probe
 
-GitHub's page says Support acts only once no forks hold references to the sensitive data (doc 04). So fork *ref-holding* is not a nice-to-have: it is the check that decides whether a Support request will be actionable. The report's *Ready for Support?* line depends on it. Object-resolvable-only fork results (cheap) are shown separately and do not block.
+GitHub's page says Support acts only once no forks hold references to the sensitive data (doc 04). So fork *ref-holding* is the check that decides whether a Support request will be actionable. The report's *Ready for Support?* line depends on it.
+
+### Ref-holding fork check (`--fork-refs`, implemented 2026-10-12)
+
+Per (fork, old SHA), in order:
+
+1. The object check above. If the SHA is **not resolvable** through the fork, no ref in that fork can hold it: `not_found`. If that check is `unknown`, the ref check is `unknown`.
+2. If resolvable, one GraphQL query per fork (heads and tags, 100 refs a page, up to 5 pages each, 20 SHAs per query) calls `Ref.compare(headRef: <sha>)` on each ref. `IDENTICAL` or `BEHIND` means the ref contains the SHA; `AHEAD` or `DIVERGED` means it does not.
+3. Any error, null compare, unexpected status, missing repository or truncated ref list is `unknown`. A ref already proven to hold the SHA stands even if a later page fails.
+
+Why not `git ls-remote`: it lists tips only, so a fork branch with the old commit buried under later commits would be missed, and `not_found` would be a false all-clear. Why not fetching the fork: it would download another person's content (see "Caveats"). `Ref.compare` returns a status and nothing else.
+
+Verified 2026-10-12: statuses and semantics on `octocat/Hello-World`; an opaque `Something went wrong` error for an unresolvable SHA (so it cannot be distinguished from a transient fault); and, for 4 real forks, agreement with the REST compare endpoint on all 9 branch pairs checked, 5 of which were ancestor-only (the case `ls-remote` cannot see). **Not verified:** that GraphQL compare works for a SHA that exists only in the parent on a fork with a non-shared object store (open question 6 still blocks that, because it needs a second account).
+
+"Ready for Support? yes" needs: `--fork-refs` ran, every fork was checked (not sampled, ADR-0004), and nothing is `unknown`.

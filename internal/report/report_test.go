@@ -93,3 +93,17 @@ func TestTableNotesResume(t *testing.T) {
 		t.Error("no note on a fresh run")
 	}
 }
+
+func TestTableWordingWhenForkRefsChecked(t *testing.T) {
+	r := sample()
+	r.Coverage.Surfaces = append(r.Coverage.Surfaces, model.SurfaceCoverage{Surface: model.SurfaceForkRef, Complete: false})
+	var b bytes.Buffer
+	Table(&b, r)
+	out := b.String()
+	if !strings.Contains(out, "(object-resolvable and ref-holding)") || strings.Contains(out, "ref-holding not probed") {
+		t.Errorf("fork coverage wording:\n%s", out)
+	}
+	if strings.Contains(out, "ref-holding forks (--fork-refs)") {
+		t.Errorf("must not list ref-holding forks as not probed when they were:\n%s", out)
+	}
+}

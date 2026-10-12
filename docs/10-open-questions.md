@@ -17,6 +17,7 @@ Last updated 2026-10-10. Closed items are kept (struck through) so the trail is 
 | 15 | Whether the Events API records force-pushes as `PushEvent` (run 2: it did not, within minutes, for either rewrite) | doc 05 | Re-check after some hours; treat as unreliable meanwhile |
 | 16 | GraphQL `beforeCommit` documentation and retention for old-SHA discovery (works in Gate 0; not in the fetched reference page) | doc 05 | GraphQL docs in a browser; test on older PRs |
 | 17 | Whether a `git-filter-repo` `commit-map` reliably yields the same "First Changed Commit(s)" value filter-repo prints | doc 04 | Compare on a test rewrite |
+| 18 | `Ref.compare(headRef: <parent-only sha>)` on a fork returns a usable status when the object store is not shared, and the behaviour for a fork that has the SHA only through the parent | doc 03 | Needs a second account (same blocker as item 6) |
 
 ## Closed
 

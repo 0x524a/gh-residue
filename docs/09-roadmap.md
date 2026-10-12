@@ -14,6 +14,8 @@ Nothing in M1 or later starts before M0.
 
 ## Status log
 
+- 2026-10-12: ref-holding fork check implemented (`--fork-refs`): GraphQL `Ref.compare` per fork, driven by the object check, every failure path `unknown`. Checked live on 4 real forks and cross-checked against the REST compare endpoint. *Ready for Support? yes* is now reachable (needs the flag, all forks checked, nothing unknown). Open question 18 added: untestable without a second account.
+
 - 2026-10-11: Gate 0 spike repo deleted at the owner's request (open question 13 now needs a fresh throwaway repo to re-probe). Public support email set; owner reports Developer Program registration done. Developer Program criteria and the no-logo rule recorded in doc 07.
 
 - 2026-10-11: CI extended: lint, tests on Linux/macOS/Windows, govulncheck, and a release-style (cgo off) build-and-run smoke test per OS. It found three real problems: golden files checked out with CRLF on Windows (fixed with `.gitattributes`), a test asserting Unix file modes on Windows, and Go 1.22 test binaries aborting on macOS 26 (`missing LC_UUID`; cgo-on only, Go 1.23+ fine, shipped cgo-off binaries unaffected). `go.mod` floor raised to 1.23. README badges added.

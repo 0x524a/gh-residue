@@ -26,5 +26,5 @@ Resumed from checkpoint: 1 result carried over unchanged (oldest checked 2026-10
 3 SHAs, 1 still exposed (1 via base_object, 1 via branch, 1 via fork_object, 7 via pr_ref); 1 check unknown. Exit code 1.
 Fork coverage: checked 2 of 40 forks (object-resolvable only; ref-holding not probed).
 Incomplete surfaces: fork_object. Treat as NOT clean.
-Not probed: web commit view (opt-in), ref-holding forks, local clones, CI caches, third-party mirrors, GH Archive.
+Not probed: web commit view (opt-in), ref-holding forks (--fork-refs), local clones, CI caches, third-party mirrors, GH Archive.
 Rotate the credential first. This tool only verifies; only GitHub Support can purge cached views and PR refs.

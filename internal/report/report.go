@@ -63,8 +63,12 @@ func Table(w io.Writer, r *model.Run) {
 	}
 	fmt.Fprintln(w, summary(r))
 	if r.Coverage.ForksTotal > 0 {
-		fmt.Fprintf(w, "Fork coverage: checked %d of %d forks (object-resolvable only; ref-holding not probed).\n",
-			r.Coverage.ForksChecked, r.Coverage.ForksTotal)
+		what := "object-resolvable only; ref-holding not probed"
+		if hasSurface(r, model.SurfaceForkRef) {
+			what = "object-resolvable and ref-holding"
+		}
+		fmt.Fprintf(w, "Fork coverage: checked %d of %d forks (%s).\n",
+			r.Coverage.ForksChecked, r.Coverage.ForksTotal, what)
 	}
 	var inc []string
 	for _, s := range r.Coverage.Surfaces {
@@ -75,7 +79,11 @@ func Table(w io.Writer, r *model.Run) {
 	if len(inc) > 0 {
 		fmt.Fprintf(w, "Incomplete surfaces: %s. Treat as NOT clean.\n", strings.Join(inc, ", "))
 	}
-	fmt.Fprintln(w, "Not probed: web commit view (opt-in), ref-holding forks, local clones, CI caches, third-party mirrors, GH Archive.")
+	notProbed := "web commit view (opt-in), ref-holding forks (--fork-refs), local clones, CI caches, third-party mirrors, GH Archive"
+	if hasSurface(r, model.SurfaceForkRef) {
+		notProbed = "web commit view (opt-in), local clones, CI caches, third-party mirrors, GH Archive"
+	}
+	fmt.Fprintf(w, "Not probed: %s.\n", notProbed)
 	fmt.Fprintln(w, "Rotate the credential first. This tool only verifies; only GitHub Support can purge cached views and PR refs.")
 }
 
@@ -131,4 +139,13 @@ func plural(n int, one, many string) string {
 		return fmt.Sprintf("1 %s", one)
 	}
 	return fmt.Sprintf("%d %s", n, many)
+}
+
+func hasSurface(r *model.Run, s model.Surface) bool {
+	for _, c := range r.Coverage.Surfaces {
+		if c.Surface == s {
+			return true
+		}
+	}
+	return false
 }

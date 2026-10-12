@@ -84,7 +84,9 @@ The draft lists the repository, the affected pull requests, the first changed co
 | Branches, tags, pull request refs | Which refs reach the SHA? | Uses a temporary mirror clone. Catches a PR merge ref that kept the old commit as a parent. |
 | Forks | Does the SHA resolve through a fork's URL? | Sampled (200 by default, `--max-forks`) and the coverage is printed. This means the object is resolvable, **not** that the fork holds a ref. |
 
-GitHub says Support acts only once no forks hold references. Checking which forks hold refs is not built yet, so the Support draft's *Ready for Support?* line can say `no` or `unknown`, never `yes`.
+GitHub says Support acts only once no forks hold references. Add `--fork-refs` to check that: for every sampled fork that can resolve the commit, it asks GitHub whether any branch or tag in the fork contains it, including as an ancestor of later commits. Nothing is downloaded from the fork; GitHub returns only a status. It needs a token.
+
+The Support draft's *Ready for Support?* line says `no` when a fork ref, branch or tag holds a commit. It says `yes` only when `--fork-refs` ran, **every** fork was checked (not a sample) and nothing is left unknown. Without `--fork-refs`, or with a sampled fork list, it says `unknown`.
 
 ## Options
 
@@ -97,12 +99,13 @@ GitHub says Support acts only once no forks hold references. Checking which fork
 | `--support-draft FILE` | Write the Support request draft. Add `--first-changed SHA` and `--lfs-file NAME` from filter-repo's output. |
 | `--max-forks N`, `--no-forks` | Size of the fork sample, or skip forks. |
 | `--no-mirror` | Skip the clone. The branch, tag and PR surfaces then count as incomplete. |
+| `--fork-refs` | Also check whether any branch or tag in each sampled fork contains an old commit (needs a token). |
 | `--concurrency N` | Parallel fork requests. Default `1`, as GitHub recommends. |
 | `--yes` | Proceed when the printed request estimate is large. |
 
 ## Token and rate limits
 
-The token comes from `GH_TOKEN`, `GITHUB_TOKEN` or your `gh` login. Read-only is enough: a fine-grained token with Contents and Metadata read, or a classic token with `repo` for private repositories. Public repositories work without one, at 60 requests an hour. The tool prints an estimate first, honors `Retry-After` and `X-RateLimit-Reset`, and reports whatever it could not finish as `unknown`.
+The token comes from `GH_TOKEN`, `GITHUB_TOKEN` or your `gh` login (required for `--fork-refs`, because GitHub's GraphQL API rejects anonymous requests). Read-only is enough: a fine-grained token with Contents and Metadata read, or a classic token with `repo` for private repositories. Public repositories work without one, at 60 requests an hour. The tool prints an estimate first, honors `Retry-After` and `X-RateLimit-Reset`, and reports whatever it could not finish as `unknown`.
 
 ## What it never does
 
@@ -117,7 +120,7 @@ Reports, checkpoints and drafts list the SHAs of a leak. Do not commit them to a
 - Local clones, CI caches and third-party mirrors are out of reach. Public repositories' push events may also sit in archives such as GH Archive; whether force-pushed SHAs reach them is untested.
 - The cached web view of a commit is not probed yet.
 - CI runs the tests and a release-style build on Linux, macOS and Windows. One Windows gap remains: passing a token to git for the mirror clone goes through a `sh` helper that CI cannot exercise, because it needs an authenticated remote. On Windows, file permissions are not enforced either, so checkpoint and draft files are not restricted to your user.
-- 11 claims are still unverified and tagged **(unverified)** in [`docs/10-open-questions.md`](docs/10-open-questions.md).
+- 12 claims are still unverified and tagged **(unverified)** in [`docs/10-open-questions.md`](docs/10-open-questions.md).
 
 ## Design
 

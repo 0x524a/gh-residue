@@ -68,7 +68,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	if len(args) == 0 || args[0] != "verify" {
-		fmt.Fprintln(stderr, "usage: gh-residue [--version] verify OWNER/REPO --input PATH [--json] [--max-forks N] [--concurrency N] [--no-forks] [--no-mirror] [--yes]\n       [--support-draft FILE] [--first-changed SHA,...] [--lfs-file NAME] [--against PREV.json]\n       [--checkpoint FILE] [--checkpoint-max-age 24h]")
+		fmt.Fprintln(stderr, "usage: gh-residue [--version] verify OWNER/REPO --input PATH [--json] [--max-forks N] [--concurrency N] [--no-forks] [--fork-refs] [--no-mirror] [--yes]\n       [--support-draft FILE] [--first-changed SHA,...] [--lfs-file NAME] [--against PREV.json]\n       [--checkpoint FILE] [--checkpoint-max-age 24h]")
 		return 2
 	}
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
@@ -77,6 +77,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	asJSON := fs.Bool("json", false, "print JSON instead of the table")
 	maxForks := fs.Int("max-forks", 200, "forks to probe (sampled by recent push, then stars)")
 	concurrency := fs.Int("concurrency", 1, "parallel fork requests; GitHub advises serial (1) to avoid secondary rate limits")
+	forkRefs := fs.Bool("fork-refs", false, "also check whether any branch or tag in each sampled fork contains an old commit (needs a token; GraphQL)")
 	noForks := fs.Bool("no-forks", false, "skip the fork probe")
 	noMirror := fs.Bool("no-mirror", false, "skip the mirror-clone probe (PR refs, branches, tags)")
 	yes := fs.Bool("yes", false, "proceed past the request-estimate threshold")
@@ -137,9 +138,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if token == "" {
 		fmt.Fprintln(stderr, "warning: no token (GH_TOKEN, GITHUB_TOKEN or `gh auth token`); public repos only, 60 requests/hour")
 	}
+	if *forkRefs && *noForks {
+		fmt.Fprintln(stderr, "--fork-refs checks forks, so it cannot be combined with --no-forks")
+		return 2
+	}
+	if *forkRefs && token == "" {
+		fmt.Fprintln(stderr, "--fork-refs needs a token: GitHub's GraphQL API rejects anonymous requests (set GH_TOKEN or run `gh auth login`)")
+		return 2
+	}
 	client := ghapi.New(token)
 
-	est, needClone := estimate(repo, commits, prevCheckpoint, *maxForks, !*noMirror, !*noForks)
+	est, needClone := estimate(repo, commits, prevCheckpoint, *maxForks, !*noMirror, !*noForks, *forkRefs)
 	probes := []probe.Probe{probe.BaseObject{Client: client}}
 	if !*noMirror {
 		probes = append(probes, probe.Mirror{CloneURL: "https://github.com/" + repo + ".git", Token: token})
@@ -150,7 +159,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		probes = append(probes, probe.Skipped{Label: "mirror", Surfaces: []model.Surface{model.SurfaceBranch, model.SurfacePRRef, model.SurfaceTag}})
 	}
 	if !*noForks {
-		probes = append(probes, probe.Forks{Client: client, Cap: *maxForks, Concurrency: *concurrency})
+		probes = append(probes, probe.Forks{Client: client, Cap: *maxForks, Concurrency: *concurrency, Refs: *forkRefs})
 	} else {
 		probes = append(probes, probe.Skipped{Label: "forks", Surfaces: []model.Surface{model.SurfaceForkObject}})
 	}
@@ -270,14 +279,17 @@ func writeCheckpoint(path string, r *model.Run) error {
 
 // estimate returns an upper bound on API requests and whether a clone is needed.
 // Results already known from a checkpoint are not counted: they are not re-requested.
-func estimate(repo string, commits []model.OldCommit, prev *model.Run, maxForks int, mirror, forks bool) (requests int, needClone bool) {
+func estimate(repo string, commits []model.OldCommit, prev *model.Run, maxForks int, mirror, forks, forkRefs bool) (requests int, needClone bool) {
 	var known *probe.Known
-	var forksDone bool
+	var forksDone, refsDone bool
 	if prev != nil {
 		known = probe.NewKnown(prev.Findings, commits)
 		for _, s := range prev.Coverage.Surfaces {
 			if s.Surface == model.SurfaceForkObject && s.Complete {
 				forksDone = true
+			}
+			if s.Surface == model.SurfaceForkRef && s.Complete {
+				refsDone = true
 			}
 		}
 	}
@@ -299,6 +311,10 @@ func estimate(repo string, commits []model.OldCommit, prev *model.Run, maxForks 
 			requests += 10 // fork list pages only; every fork/SHA pair is already known
 		} else {
 			requests += len(commits)*maxForks + 10
+		}
+		if forkRefs && !refsDone {
+			// Upper bound: per fork, 2 ref prefixes x ceil(SHAs/20) GraphQL queries (more for >100 refs).
+			requests += maxForks * 2 * ((len(commits) + 19) / 20)
 		}
 	}
 	return requests, needClone

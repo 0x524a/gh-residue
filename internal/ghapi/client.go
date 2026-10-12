@@ -2,7 +2,9 @@
 package ghapi
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -73,10 +75,35 @@ var ErrRateLimited = errors.New("rate limited")
 // decide what they mean. Errors are transport failures or exhausted rate limits;
 // callers must map them to Unknown.
 func (c *Client) Get(ctx context.Context, path string) (*Response, error) {
+	return c.do(ctx, http.MethodGet, path, nil)
+}
+
+// GraphQL posts a query. It needs a token (GitHub rejects anonymous GraphQL), and
+// shares Get's rate-limit handling. A 200 can still carry "errors" in the body;
+// callers must check, and treat any of them as Unknown.
+func (c *Client) GraphQL(ctx context.Context, query string, vars map[string]any) (*Response, error) {
+	if c.Token == "" {
+		return nil, errors.New("GraphQL requires a token")
+	}
+	body, err := json.Marshal(map[string]any{"query": query, "variables": vars})
+	if err != nil {
+		return nil, err
+	}
+	return c.do(ctx, http.MethodPost, "/graphql", body)
+}
+
+func (c *Client) do(ctx context.Context, method, path string, payload []byte) (*Response, error) {
 	for attempt := 0; ; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
+		var rdr io.Reader
+		if payload != nil {
+			rdr = bytes.NewReader(payload) // fresh reader per attempt: retries resend the body
+		}
+		req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, rdr)
 		if err != nil {
 			return nil, err
+		}
+		if payload != nil {
+			req.Header.Set("Content-Type", "application/json")
 		}
 		req.Header.Set("Accept", "application/vnd.github+json")
 		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")

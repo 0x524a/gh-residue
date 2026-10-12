@@ -39,6 +39,15 @@ func (k *Known) Has(sha string, s model.Surface, location string) bool {
 	return ok
 }
 
+// Status returns the known status for exactly this (sha, surface, location).
+func (k *Known) Status(sha string, s model.Surface, location string) (model.Status, bool) {
+	if k == nil {
+		return "", false
+	}
+	f, ok := k.m[knownKey{sha, s, location}]
+	return f.Status, ok
+}
+
 // SurfaceKnown reports any known result for (sha, surface), at any location.
 // Enumerated surfaces always carry at least one row once checked (a "*" row
 // when nothing was found), so this means that surface was fully checked.

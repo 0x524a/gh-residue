@@ -15,4 +15,5 @@ Probe a capped, prioritized sample (default 200, ordered by recent push and star
 - Honest partial answers instead of silent truncation.
 - Default numbers are a guess; tuned after M1 (doc 10, item 11).
 - Because forks may share an object store **(unverified)**, a hit on the parent already implies network-wide resolvability; the fork probe mainly identifies which forks hold refs.
+- Update 2026-10-12: ref-holding forks are now checked with `--fork-refs` (doc 03). *Ready for Support?* can be `yes`, but only with that flag, full fork coverage and no unknown results.
 - Update 2026-10-10: GitHub documents that Support acts only when no forks hold references to the data. A sampled result therefore can never report *Ready for Support?* as `yes`; with an incomplete fork sample the answer is `unknown`.
