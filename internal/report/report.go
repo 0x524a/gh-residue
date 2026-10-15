@@ -73,7 +73,7 @@ func Table(w io.Writer, r *model.Run) {
 			fmt.Fprintf(w, "Fork coverage is incomplete: %s.\n", r.Coverage.ForksIncompleteReason)
 		}
 		if n := r.Coverage.ForksHidden; n > 0 {
-			fmt.Fprintf(w, "%s listed but hidden by GitHub (the repository and its owner both answer 404); only GitHub Support can check them, so they count as unknown.\n", plural(n, "fork is", "forks are"))
+			fmt.Fprintf(w, "%s listed but hidden by GitHub (the repository and its owner both answer 404); only GitHub Support can check them, so they count as unknown%s.\n", plural(n, "fork is", "forks are"), acceptedNote(r))
 		}
 		if n := r.Coverage.ForkCommitsSkipped; n > 0 {
 			fmt.Fprintf(w, "Forks were checked for the first changed commits only; %s not checked one by one. A ref that holds any rewritten commit also holds a first changed commit.\n", plural(n, "other commit was", "other commits were"))
@@ -157,4 +157,13 @@ func hasSurface(r *model.Run, s model.Surface) bool {
 		}
 	}
 	return false
+}
+
+// acceptedNote says how a hidden-fork acceptance changes the verdict: only the
+// Support readiness line, never the exit code.
+func acceptedNote(r *model.Run) string {
+	if r.Coverage.HiddenAccepted {
+		return " (accepted for the Support readiness line only; the exit code still treats them as unknown)"
+	}
+	return ""
 }

@@ -64,8 +64,14 @@ type Coverage struct {
 	// Commits not requested per fork: covered through the first changed commits.
 	ForkCommitsSkipped int `json:"fork_commits_skipped,omitempty"`
 	// Listed forks hidden by GitHub (repository and owner both 404); never counted as clean.
-	ForksHidden int               `json:"forks_hidden,omitempty"`
-	Surfaces    []SurfaceCoverage `json:"surfaces"`
+	ForksHidden int `json:"forks_hidden,omitempty"`
+	// Their names, and whether the user accepted them for the Support readiness line
+	// (--accept-hidden-forks). Acceptance never changes the exit code.
+	HiddenForks    []string `json:"hidden_forks,omitempty"`
+	HiddenAccepted bool     `json:"hidden_forks_accepted,omitempty"`
+	// The fork-coverage reason that remains once accepted hidden forks are set aside.
+	ForksReasonAccepted string            `json:"forks_incomplete_reason_accepted,omitempty"`
+	Surfaces            []SurfaceCoverage `json:"surfaces"`
 }
 
 type Inputs struct {
@@ -107,8 +113,25 @@ func (r *Run) Sort() {
 // Incomplete reports whether any check did not finish: a failed probe, sampled
 // forks, an incomplete surface, or any finding that is not confirmed/not_found.
 // Confirmed exposures do not hide incompleteness.
-func (r *Run) Incomplete() bool {
-	if r.Coverage.ProbesFailed > 0 || r.Coverage.ForksChecked < r.Coverage.ForksTotal || r.Coverage.ForksIncompleteReason != "" {
+func (r *Run) Incomplete() bool { return r.incomplete(false) }
+
+// IncompleteForSupport is Incomplete, except that when the user accepted hidden
+// forks their (unknown) fork findings do not count. Only the "Ready for Support?"
+// line uses it; the exit code never does.
+func (r *Run) IncompleteForSupport() bool { return r.incomplete(r.Coverage.HiddenAccepted) }
+
+func (r *Run) incomplete(skipHidden bool) bool {
+	hidden := map[string]bool{}
+	if skipHidden {
+		for _, h := range r.Coverage.HiddenForks {
+			hidden[h] = true
+		}
+	}
+	reason := r.Coverage.ForksIncompleteReason
+	if skipHidden {
+		reason = r.Coverage.ForksReasonAccepted
+	}
+	if r.Coverage.ProbesFailed > 0 || r.Coverage.ForksChecked < r.Coverage.ForksTotal || reason != "" {
 		return true
 	}
 	for _, s := range r.Coverage.Surfaces {
@@ -117,6 +140,9 @@ func (r *Run) Incomplete() bool {
 		}
 	}
 	for _, f := range r.Findings {
+		if hidden[f.Location] && (f.Surface == SurfaceForkObject || f.Surface == SurfaceForkRef) {
+			continue
+		}
 		if f.Status != Confirmed && f.Status != NotFound { // Unknown or unrecognised is never clean.
 			return true
 		}

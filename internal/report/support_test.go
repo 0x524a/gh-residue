@@ -90,3 +90,27 @@ func TestReadinessNamesHiddenForks(t *testing.T) {
 		t.Fatalf("%q %q", ans, why)
 	}
 }
+
+func TestReadinessYesWhenHiddenForksAcceptedAndNothingElseIsMissing(t *testing.T) {
+	r := &model.Run{
+		Coverage: model.Coverage{ForksTotal: 2, ForksChecked: 2, HiddenAccepted: true, HiddenForks: []string{"gone/r"},
+			Surfaces: []model.SurfaceCoverage{{Surface: model.SurfaceForkRef, Complete: true}}},
+		Findings: []model.Finding{
+			{OldSHA: "a", Surface: model.SurfaceForkRef, Location: "ok/r", Status: model.NotFound},
+			{OldSHA: "a", Surface: model.SurfaceForkRef, Location: "gone/r", Status: model.Unknown},
+		},
+	}
+	ans, why := Readiness(r)
+	if ans != "yes" || !strings.Contains(why, "1 forks hidden by GitHub") {
+		t.Fatalf("%q %q", ans, why)
+	}
+	var b bytes.Buffer
+	SupportDraft(&b, r, SupportOpts{})
+	if !strings.Contains(b.String(), "hidden from the API") {
+		t.Fatalf("the draft must disclose hidden forks:\n%s", b.String())
+	}
+	r.Coverage.HiddenAccepted = false
+	if ans, _ := Readiness(r); ans == "yes" {
+		t.Fatal("without acceptance it must not be yes")
+	}
+}

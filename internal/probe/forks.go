@@ -32,6 +32,9 @@ type Forks struct {
 	// When set, fork checks run for the anchors only and the other commits are
 	// not requested per fork (forks x commits would be millions of calls).
 	Anchors []string
+	// AcceptHidden lets the "Ready for Support?" line ignore forks GitHub hides. They
+	// stay unknown in every finding and the exit code is unchanged.
+	AcceptHidden bool
 }
 
 func (Forks) Name() string { return "forks" }
@@ -63,11 +66,11 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 	if err != nil {
 		return p.failed(commits, "fork count: "+err.Error())
 	}
-	forks, listComplete, listErr := p.list(ctx, repo, maxPages)
+	forks, listComplete, gaps, listErr := p.collect(ctx, repo, maxPages)
 	if listErr != nil {
 		return p.failed(commits, "fork list: "+listErr.Error())
 	}
-	reason := incompleteReason(forks, listComplete, maxPages, source)
+	reason := incompleteReason(listComplete, maxPages, source, len(gaps))
 	allForks := forks
 	sort.SliceStable(forks, func(i, j int) bool {
 		if forks[i].PushedAt != forks[j].PushedAt {
@@ -111,7 +114,8 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 	close(jobs)
 	wg.Wait()
 
-	hidden := p.markHidden(ctx, &res)
+	hiddenNames := p.markHidden(ctx, &res)
+	hidden := len(hiddenNames)
 	if p.Refs {
 		p.checkRefs(ctx, &res, repo, forks, commits, conc)
 	}
@@ -124,15 +128,34 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 	res.ForksIncompleteReason = reason
 	res.ForkCommitsSkipped = len(all) - len(commits)
 	res.ForksHidden = hidden
-	forksDone := res.ForksChecked >= res.ForksTotal && reason == ""
+	res.HiddenForks = hiddenNames
+	res.HiddenAccepted = p.AcceptHidden && hidden > 0
+	skip := map[string]bool{}
+	acceptedReason := reason
+	if res.HiddenAccepted {
+		for _, h := range hiddenNames {
+			skip[h] = true
+		}
+		// Forks below a hidden fork cannot be listed either; they are covered by the
+		// same acceptance.
+		open := 0
+		for _, g := range gaps {
+			if !skip[g] {
+				open++
+			}
+		}
+		acceptedReason = incompleteReason(listComplete, maxPages, source, open)
+		res.ForksReasonAccepted = acceptedReason
+	}
+	forksDone := res.ForksChecked >= res.ForksTotal && acceptedReason == ""
 	res.Surfaces = []model.SurfaceCoverage{{
 		Surface:  model.SurfaceForkObject,
-		Complete: complete(res.Findings, model.SurfaceForkObject) && forksDone,
+		Complete: completeExcept(res.Findings, model.SurfaceForkObject, skip) && forksDone,
 	}}
 	if p.Refs {
 		res.Surfaces = append(res.Surfaces, model.SurfaceCoverage{
 			Surface:  model.SurfaceForkRef,
-			Complete: complete(res.Findings, model.SurfaceForkRef) && forksDone,
+			Complete: completeExcept(res.Findings, model.SurfaceForkRef, skip) && forksDone,
 		})
 	}
 	return res
@@ -144,7 +167,7 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 // from missing access, and a hidden repository may still hold refs that only
 // GitHub Support can see. The count is reported so the reader can tell "hidden by
 // GitHub" from "failed to check".
-func (p Forks) markHidden(ctx context.Context, res *Result) int {
+func (p Forks) markHidden(ctx context.Context, res *Result) []string {
 	all404 := map[string]bool{}
 	reachable := false
 	for _, f := range res.Findings {
@@ -162,7 +185,7 @@ func (p Forks) markHidden(ctx context.Context, res *Result) int {
 		}
 	}
 	if !reachable {
-		return 0
+		return nil
 	}
 	hidden := map[string]bool{}
 	for fork, ok := range all404 {
@@ -181,7 +204,12 @@ func (p Forks) markHidden(ctx context.Context, res *Result) int {
 			f.Evidence = "HTTP 404; the fork and its owner account are hidden from the API"
 		}
 	}
-	return len(hidden)
+	names := make([]string, 0, len(hidden))
+	for h := range hidden {
+		names = append(names, h)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // checkRefs adds one fork_ref finding per (fork, SHA). The object check decides:
@@ -337,8 +365,62 @@ func (p Forks) list(ctx context.Context, repo string, maxPages int) ([]forkInfo,
 	return all, false, nil // last page was full: there may be more
 }
 
+// Forks of forks are listed breadth-first, bounded in depth and in listing calls.
+const (
+	maxForkDepth   = 3
+	maxNestedLists = 100
+)
+
+// collect lists the repository's forks and, below them, forks of forks. gaps counts
+// the forks whose own forks could not be listed (the listing failed, for example
+// because the fork is hidden, or the depth or call budget ran out): their children
+// stay unchecked, so the coverage is incomplete. complete is false if any listing
+// was cut short. A failure to list the repository's own forks is returned as an error.
+func (p Forks) collect(ctx context.Context, repo string, maxPages int) (all []forkInfo, complete bool, gaps []string, err error) {
+	top, complete, err := p.list(ctx, repo, maxPages)
+	if err != nil {
+		return nil, false, nil, err
+	}
+	seen := map[string]bool{strings.ToLower(repo): true}
+	type node struct {
+		f     forkInfo
+		depth int
+	}
+	var queue []node
+	add := func(fs []forkInfo, depth int) {
+		for _, f := range fs {
+			if k := strings.ToLower(f.FullName); !seen[k] {
+				seen[k] = true
+				all = append(all, f)
+				queue = append(queue, node{f, depth})
+			}
+		}
+	}
+	add(top, 1)
+	lists := 0
+	for i := 0; i < len(queue); i++ {
+		n := queue[i]
+		if n.f.ForksCount == 0 {
+			continue
+		}
+		if n.depth >= maxForkDepth || lists >= maxNestedLists {
+			gaps = append(gaps, n.f.FullName)
+			continue
+		}
+		lists++
+		kids, kidsComplete, kerr := p.list(ctx, n.f.FullName, maxPages)
+		if kerr != nil {
+			gaps = append(gaps, n.f.FullName)
+			continue
+		}
+		complete = complete && kidsComplete
+		add(kids, n.depth+1)
+	}
+	return all, complete, gaps, nil
+}
+
 // incompleteReason says why the listed forks cannot be treated as every fork.
-func incompleteReason(forks []forkInfo, listComplete bool, maxPages int, source string) string {
+func incompleteReason(listComplete bool, maxPages int, source string, gaps int) string {
 	var why []string
 	if source != "" {
 		// Only the repository's own forks are listed. The rest of its network (the
@@ -348,14 +430,8 @@ func incompleteReason(forks []forkInfo, listComplete bool, maxPages int, source 
 	if !listComplete {
 		why = append(why, fmt.Sprintf("only the first %d forks GitHub lists were seen", maxPages*100))
 	}
-	nested := 0
-	for _, f := range forks {
-		if f.ForksCount > 0 {
-			nested++
-		}
-	}
-	if nested > 0 {
-		why = append(why, fmt.Sprintf("%d listed forks have forks of their own, which are not checked", nested))
+	if gaps > 0 {
+		why = append(why, fmt.Sprintf("%d listed forks have forks of their own that could not be listed", gaps))
 	}
 	return strings.Join(why, "; ")
 }

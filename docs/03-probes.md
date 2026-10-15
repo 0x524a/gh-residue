@@ -45,6 +45,6 @@ Verified 2026-10-12: statuses and semantics on `octocat/Hello-World`; an opaque 
 Coverage is judged from the fork **listing**, not from `forks_count`, which is a cached counter that undercounts (1014 reported, 1056 real forks on `newren/git-filter-repo`). The listing is deduplicated by name and uses `sort=oldest` so pages stay stable while forks are created. Fork coverage is recorded as incomplete, with a stated reason in `forks_incomplete_reason`, when:
 
 - the listing did not end on a short page (only the first 1000 forks were seen), or
-- a listed fork has forks of its own (`forks_count` > 0 on that fork). Forks of forks are not enumerated.
+- a listed fork has forks of its own that could not be listed. Forks of forks are enumerated breadth-first (a fork with `forks_count` > 0 is listed in turn), to three levels and 100 extra listing calls; a fork whose listing fails (for example a hidden fork) or lies past those bounds is a gap.
 
-A sample smaller than the list (`--max-forks`) is incomplete too. "Ready for Support? yes" needs: `--fork-refs` ran, every listed fork was checked, none of the reasons above applies, nothing is `unknown`, and there is at least one finding. It still rests on GitHub's own counters: a fork-of-a-fork created moments ago that the cached counts do not yet show would be missed.
+A sample smaller than the list (`--max-forks`) is incomplete too. "Ready for Support? yes" needs: `--fork-refs` ran, every listed fork was checked, none of the reasons above applies, nothing is `unknown`, and there is at least one finding. It still rests on GitHub's own counters: a nested fork is only looked for where a fork's cached `forks_count` is above zero, so a fork-of-a-fork created moments ago that the count does not yet show would be missed.

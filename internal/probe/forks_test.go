@@ -197,3 +197,130 @@ func TestNothingIsHiddenWhenNoForkAnswers(t *testing.T) {
 		t.Fatalf("hidden %d", res.ForksHidden)
 	}
 }
+
+// Forks of forks are listed and checked, and only those that cannot be listed are
+// a coverage gap.
+func TestNestedForksAreEnumeratedAndChecked(t *testing.T) {
+	c, done := apiClient(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		switch {
+		case p == "/repos/o/r":
+			fmt.Fprint(w, `{"forks_count":2}`)
+		case p == "/repos/o/r/forks":
+			fmt.Fprint(w, `[{"full_name":"a/f","forks_count":1},{"full_name":"b/g","forks_count":0}]`)
+		case p == "/repos/a/f/forks":
+			fmt.Fprint(w, `[{"full_name":"c/h","forks_count":0}]`)
+		case strings.Contains(p, "/commits/"):
+			w.WriteHeader(422)
+			w.Write([]byte(`{"message":"No commit found for SHA"}`))
+		default:
+			w.WriteHeader(404)
+		}
+	})
+	defer done()
+	res := Forks{Client: c}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	if res.ForksIncompleteReason != "" {
+		t.Fatalf("every fork was listed, reason %q", res.ForksIncompleteReason)
+	}
+	got := map[string]bool{}
+	for _, f := range res.Findings {
+		got[f.Location] = true
+	}
+	if !got["c/h"] || res.ForksTotal != 3 || res.ForksChecked != 3 {
+		t.Fatalf("nested fork not checked: %v total=%d", got, res.ForksTotal)
+	}
+	if !res.Surfaces[0].Complete {
+		t.Fatal("complete when all nested forks were listed and clean")
+	}
+}
+
+func TestNestedForksPastTheDepthLimitAreAGap(t *testing.T) {
+	c, done := apiClient(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		switch {
+		case p == "/repos/o/r":
+			fmt.Fprint(w, `{"forks_count":1}`)
+		case strings.HasSuffix(p, "/forks"): // every fork has one more fork below it
+			parts := strings.Split(p, "/")
+			fmt.Fprintf(w, `[{"full_name":"%sx/r","forks_count":1}]`, parts[2])
+		case strings.Contains(p, "/commits/"):
+			w.WriteHeader(422)
+			w.Write([]byte(`{"message":"No commit found for SHA"}`))
+		default:
+			w.WriteHeader(404)
+		}
+	})
+	defer done()
+	res := Forks{Client: c}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	if !strings.Contains(res.ForksIncompleteReason, "could not be listed") || res.ForksTotal != maxForkDepth {
+		t.Fatalf("total=%d reason=%q", res.ForksTotal, res.ForksIncompleteReason)
+	}
+}
+
+func TestAcceptHiddenOnlyAffectsCompletenessOfTheForkSurfaces(t *testing.T) {
+	h := func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		switch {
+		case p == "/repos/o/r":
+			fmt.Fprint(w, `{"forks_count":2}`)
+		case p == "/repos/o/r/forks":
+			fmt.Fprint(w, `[{"full_name":"ok/r"},{"full_name":"gone/r"}]`)
+		case p == "/users/gone":
+			w.WriteHeader(404)
+		case strings.HasPrefix(p, "/repos/ok/"):
+			w.WriteHeader(422)
+			w.Write([]byte(`{"message":"No commit found for SHA"}`))
+		default:
+			w.WriteHeader(404)
+		}
+	}
+	c, done := apiClient(h)
+	defer done()
+	commits := []model.OldCommit{{SHA: sha}}
+	strict := Forks{Client: c}.Run(context.Background(), "o/r", commits)
+	if strict.Surfaces[0].Complete || strict.HiddenAccepted {
+		t.Fatalf("without the flag hidden forks keep the surface incomplete: %+v", strict)
+	}
+	acc := Forks{Client: c, AcceptHidden: true}.Run(context.Background(), "o/r", commits)
+	if !acc.Surfaces[0].Complete || !acc.HiddenAccepted || len(acc.HiddenForks) != 1 || acc.HiddenForks[0] != "gone/r" {
+		t.Fatalf("%+v", acc)
+	}
+	for _, f := range acc.Findings {
+		if f.Location == "gone/r" && f.Status != model.Unknown {
+			t.Fatalf("accepting must never change a finding: %+v", f)
+		}
+	}
+}
+
+// Forks below a hidden fork cannot be listed; accepting hidden forks sets them aside
+// for the readiness line only.
+func TestAcceptHiddenCoversForksBelowAHiddenFork(t *testing.T) {
+	c, done := apiClient(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		switch {
+		case p == "/repos/o/r":
+			fmt.Fprint(w, `{"forks_count":3}`)
+		case p == "/repos/o/r/forks":
+			fmt.Fprint(w, `[{"full_name":"ok/r"},{"full_name":"gone/r","forks_count":1},{"full_name":"vis/r","forks_count":2}]`)
+		case p == "/users/gone":
+			w.WriteHeader(404)
+		case strings.HasPrefix(p, "/repos/ok/") || strings.HasPrefix(p, "/repos/vis/") && strings.Contains(p, "/commits/"):
+			w.WriteHeader(422)
+			w.Write([]byte(`{"message":"No commit found for SHA"}`))
+		default:
+			w.WriteHeader(404) // includes /repos/gone/r/forks and /repos/vis/r/forks
+		}
+	})
+	defer done()
+	commits := []model.OldCommit{{SHA: sha}}
+	res := Forks{Client: c, AcceptHidden: true}.Run(context.Background(), "o/r", commits)
+	if !strings.Contains(res.ForksIncompleteReason, "2 listed forks") {
+		t.Fatalf("strict reason %q", res.ForksIncompleteReason)
+	}
+	if !strings.Contains(res.ForksReasonAccepted, "1 listed forks") {
+		t.Fatalf("a visible fork whose forks cannot be listed stays a gap: %q", res.ForksReasonAccepted)
+	}
+	if res.Surfaces[0].Complete {
+		t.Fatal("the visible gap must keep the surface incomplete")
+	}
+}

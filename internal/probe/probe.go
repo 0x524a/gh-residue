@@ -20,8 +20,13 @@ type Result struct {
 	// Commits not individually checked on fork surfaces (covered via anchors).
 	ForkCommitsSkipped int
 	// Listed forks that GitHub hides (repository and owner both 404).
-	ForksHidden int
-	Failed      bool // the probe could not run at all
+	ForksHidden    int
+	HiddenForks    []string
+	HiddenAccepted bool
+	// The incomplete-coverage reason once hidden forks (and the forks below them) are
+	// set aside; empty means nothing else is missing. Set only when hidden forks were accepted.
+	ForksReasonAccepted string
+	Failed              bool // the probe could not run at all
 }
 
 type Probe interface {
@@ -43,6 +48,16 @@ func finding(sha string, s model.Surface, loc string, st model.Status, ev string
 func complete(fs []model.Finding, s model.Surface) bool {
 	for _, f := range fs {
 		if f.Surface == s && f.Status != model.NotFound && f.Status != model.Confirmed {
+			return false
+		}
+	}
+	return true
+}
+
+// completeExcept is complete, ignoring findings at the given locations.
+func completeExcept(fs []model.Finding, s model.Surface, skip map[string]bool) bool {
+	for _, f := range fs {
+		if f.Surface == s && !skip[f.Location] && f.Status != model.NotFound && f.Status != model.Confirmed {
 			return false
 		}
 	}

@@ -54,5 +54,5 @@ The repository Events API records force-pushes as `PushEvent` with `before` set 
 | No token | Warn and continue: public repositories work at 60 requests/hour; a private repository is `unknown`. `--fork-refs` needs a token and exits 2 without one |
 | Wrong scope | The affected checks are `unknown`, never `not_found` |
 | Private repo the token cannot read | `unknown`, never `not_found` |
-| Fork list truncated, or a listed fork has forks of its own | Fork coverage incomplete with a stated reason (`forks_incomplete_reason`); exit 2 unless something is confirmed |
+| Fork list truncated, or a fork's own forks cannot be listed | Fork coverage incomplete with a stated reason (`forks_incomplete_reason`); exit 2 unless something is confirmed |
 | Fork deleted mid-run | `unknown` for that fork |

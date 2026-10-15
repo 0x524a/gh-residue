@@ -26,7 +26,7 @@ import (
 // version is the release line; bump it with each tag. The commit is appended at
 // runtime from Go's VCS build info, so no -ldflags are needed (the extension
 // release action only takes plain go build options).
-const baseVersion = "0.2.1"
+const baseVersion = "0.3.0"
 
 var version = buildVersion(baseVersion)
 
@@ -77,6 +77,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	asJSON := fs.Bool("json", false, "print JSON instead of the table")
 	maxForks := fs.Int("max-forks", 200, "forks to probe (sampled by recent push, then stars)")
 	concurrency := fs.Int("concurrency", 1, "parallel fork requests; GitHub advises serial (1) to avoid secondary rate limits")
+	acceptHidden := fs.Bool("accept-hidden-forks", false, "let the Support readiness line ignore forks GitHub hides (needs --fork-refs; the exit code is unchanged)")
 	forkRefs := fs.Bool("fork-refs", false, "also check whether any branch or tag in each sampled fork contains an old commit (needs a token; GraphQL)")
 	noForks := fs.Bool("no-forks", false, "skip the fork probe")
 	noMirror := fs.Bool("no-mirror", false, "skip the mirror-clone probe (PR refs, branches, tags)")
@@ -142,6 +143,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "--fork-refs checks forks, so it cannot be combined with --no-forks")
 		return 2
 	}
+	if *acceptHidden && !*forkRefs {
+		fmt.Fprintln(stderr, "--accept-hidden-forks only affects the --fork-refs readiness line; add --fork-refs")
+		return 2
+	}
 	if *forkRefs && token == "" {
 		fmt.Fprintln(stderr, "--fork-refs needs a token: GitHub's GraphQL API rejects anonymous requests (set GH_TOKEN or run `gh auth login`)")
 		return 2
@@ -182,7 +187,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		probes = append(probes, probe.Skipped{Label: "mirror", Surfaces: []model.Surface{model.SurfaceBranch, model.SurfacePRRef, model.SurfaceTag}})
 	}
 	if !*noForks {
-		probes = append(probes, probe.Forks{Client: client, Cap: *maxForks, Concurrency: *concurrency, Refs: *forkRefs, Anchors: anchors})
+		probes = append(probes, probe.Forks{Client: client, Cap: *maxForks, Concurrency: *concurrency, Refs: *forkRefs, Anchors: anchors, AcceptHidden: *acceptHidden})
 	} else {
 		probes = append(probes, probe.Skipped{Label: "forks", Surfaces: []model.Surface{model.SurfaceForkObject}})
 	}

@@ -49,12 +49,15 @@ func Readiness(r *model.Run) (answer, why string) {
 			return "unknown", "forks are not fully covered: " + r.Coverage.ForksIncompleteReason
 		}
 		if n := r.Coverage.ForksHidden; n > 0 {
-			return "unknown", fmt.Sprintf("%d listed forks are hidden by GitHub and cannot be checked; only GitHub Support can see them", n)
+			return "unknown", fmt.Sprintf("%d listed forks are hidden by GitHub and cannot be checked; only GitHub Support can see them (--accept-hidden-forks accepts this for the readiness line)", n)
 		}
 		return "unknown", "ref-holding forks were not fully checked (run with --fork-refs, and check every fork)"
 	}
-	if r.Incomplete() {
+	if r.IncompleteForSupport() {
 		return "unknown", "some checks were incomplete"
+	}
+	if r.Coverage.HiddenAccepted {
+		return "yes", fmt.Sprintf("no non-PR references and no visible fork holds references; %d forks hidden by GitHub were not checked and were accepted with --accept-hidden-forks", len(r.Coverage.HiddenForks))
 	}
 	return "yes", "no non-PR references and no forks hold references"
 }
@@ -156,6 +159,9 @@ func SupportDraft(w io.Writer, r *model.Run, o SupportOpts) {
 		fmt.Fprintf(w, "- Forks checked: %d of %d (%s)\n", r.Coverage.ForksChecked, r.Coverage.ForksTotal, what)
 		if r.Coverage.ForksIncompleteReason != "" {
 			fmt.Fprintf(w, "- Fork coverage is incomplete: %s\n", r.Coverage.ForksIncompleteReason)
+		}
+		if r.Coverage.HiddenAccepted {
+			fmt.Fprintf(w, "- %d listed forks are hidden from the API (the repository and its owner return 404) and could not be checked. Please check them on your side.\n", len(r.Coverage.HiddenForks))
 		}
 	}
 	fmt.Fprintf(w, "\n**Ready for Support?** %s: %s.\n", ready, why)

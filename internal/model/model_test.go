@@ -60,3 +60,29 @@ func TestSortDeterministic(t *testing.T) {
 		t.Fatalf("bad order: %+v", r.Findings)
 	}
 }
+
+func TestAcceptedHiddenForksNeverChangeTheExitCode(t *testing.T) {
+	r := &Run{
+		Coverage: Coverage{ForksTotal: 2, ForksChecked: 2, HiddenAccepted: true, HiddenForks: []string{"gone/r"},
+			Surfaces: []SurfaceCoverage{{Surface: SurfaceForkObject, Complete: true}}},
+		Findings: []Finding{
+			{OldSHA: "a", Surface: SurfaceForkObject, Location: "ok/r", Status: NotFound},
+			{OldSHA: "a", Surface: SurfaceForkObject, Location: "gone/r", Status: Unknown},
+		},
+	}
+	if !r.Incomplete() || r.ExitCode() != 2 {
+		t.Fatal("the exit code must still treat a hidden fork as unknown")
+	}
+	if r.IncompleteForSupport() {
+		t.Fatal("an accepted hidden fork must not block the Support readiness line")
+	}
+	r.Findings = append(r.Findings, Finding{OldSHA: "a", Surface: SurfaceForkObject, Location: "other/r", Status: Unknown})
+	if !r.IncompleteForSupport() {
+		t.Fatal("only the hidden forks are excused")
+	}
+	r.Findings[2].Location = "gone/r"
+	r.Findings = append(r.Findings, Finding{OldSHA: "a", Surface: SurfaceBaseObject, Location: "gone/r", Status: Unknown})
+	if !r.IncompleteForSupport() {
+		t.Fatal("a non-fork surface at that location is not excused")
+	}
+}

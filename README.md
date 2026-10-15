@@ -88,7 +88,7 @@ Forks are checked for filter-repo's first changed commits (read from the `first-
 
 GitHub says Support acts only once no forks hold references. Add `--fork-refs` to check that: for every sampled fork that can resolve the commit, it asks GitHub whether any branch, tag or other ref in the fork contains it, including as an ancestor of later commits. Nothing is downloaded from the fork; GitHub returns only a status. It needs a token.
 
-The Support draft's *Ready for Support?* line says `no` when a fork ref, branch or tag holds a commit. It says `yes` only when `--fork-refs` ran, **every** listed fork was checked (not a sample) and nothing is left unknown. Without `--fork-refs`, with a sampled fork list, with more than 1,000 forks, or when a listed fork has forks of its own (those are not checked), it says `unknown`, and the report says why. A fork that has pull requests is checked through its own pull refs, which REST lists and the compare endpoint tests; if that listing looks incomplete it stays `unknown`. A fork that GitHub hides (its repository and its owner both answer 404) stays `unknown` too and is counted in the report: only GitHub Support can see it. A repository that is itself a fork is `unknown` as well, because the rest of its network is not enumerated.
+The Support draft's *Ready for Support?* line says `no` when a fork ref, branch or tag holds a commit. It says `yes` only when `--fork-refs` ran, **every** listed fork was checked (not a sample) and nothing is left unknown. Without `--fork-refs`, with a sampled fork list, with more than 1,000 forks, or when a fork's own forks cannot be listed, it says `unknown`, and the report says why. A fork that has pull requests is checked through its own pull refs, which REST lists and the compare endpoint tests; if that listing looks incomplete it stays `unknown`. Forks of forks are listed too (down to three levels, within a call budget) and checked like the rest. A fork that GitHub hides (its repository and its owner both answer 404) stays `unknown` and is counted in the report: only GitHub Support can see it. If you decide that risk is acceptable, `--accept-hidden-forks` lets the *Ready for Support?* line read `yes` anyway and the draft asks Support to check those forks. It changes nothing else: the findings and the exit code still treat them as unknown. A repository that is itself a fork is `unknown` as well, because the rest of its network is not enumerated.
 
 ## Options
 
@@ -101,6 +101,7 @@ The Support draft's *Ready for Support?* line says `no` when a fork ref, branch 
 | `--support-draft FILE` | Write the Support request draft. Add `--first-changed SHA` and `--lfs-file NAME` from filter-repo's output. |
 | `--max-forks N`, `--no-forks` | Size of the fork sample, or skip forks. |
 | `--no-mirror` | Skip the clone. The branch, tag and PR surfaces then count as incomplete. |
+| `--accept-hidden-forks` | With `--fork-refs`, let *Ready for Support?* ignore forks GitHub hides. The exit code and findings are unchanged. |
 | `--fork-refs` | Also check whether any branch or tag in each sampled fork contains an old commit (needs a token). |
 | `--concurrency N` | Parallel fork requests. Default `1`, as GitHub recommends. |
 | `--yes` | Proceed when the printed request estimate is large. |
