@@ -28,7 +28,7 @@ import (
 // The query uses refPrefix "refs/", which returns every ref except refs/pull/*
 // (checked on git/git: heads, tags and a refs/notes ref all appear). Pull refs of
 // the fork itself are invisible to GraphQL, so a fork with any pull requests
-// can never be reported clean (see pullNote).
+// are checked separately through REST and compare (forkpulls.go).
 
 const (
 	refsPageSize    = 100
@@ -73,7 +73,7 @@ func refsQuery(shas []string) string {
 }
 
 // forkRefHolders returns a verdict per SHA for one fork.
-func forkRefHolders(ctx context.Context, c *ghapi.Client, fork string, shas []string) map[string]refVerdict {
+func forkRefHolders(ctx context.Context, c *ghapi.Client, base, fork string, shas []string) map[string]refVerdict {
 	out := make(map[string]refVerdict, len(shas))
 	owner, name, ok := strings.Cut(fork, "/")
 	if !ok {
@@ -84,7 +84,7 @@ func forkRefHolders(ctx context.Context, c *ghapi.Client, fork string, shas []st
 	}
 	holders := map[string][]string{}
 	unknown := map[string]string{}
-	pullNote := ""
+	prTotal := 0
 	var valid []string
 	for _, s := range shas {
 		if !sha40.MatchString(s) {
@@ -116,9 +116,7 @@ func forkRefHolders(ctx context.Context, c *ghapi.Client, fork string, shas []st
 			case parsed.Data.Repository == nil:
 				markAll(unknown, chunk, "repository not available")
 			default:
-				if n := parsed.Data.Repository.PullRequests.TotalCount; n > 0 {
-					pullNote = fmt.Sprintf("fork has %d pull requests; their refs cannot be checked", n)
-				}
+				prTotal = max(prTotal, parsed.Data.Repository.PullRequests.TotalCount)
 				for _, node := range parsed.Data.Repository.Refs.Nodes {
 					var refName string
 					_ = json.Unmarshal(node["name"], &refName)
@@ -150,6 +148,19 @@ func forkRefHolders(ctx context.Context, c *ghapi.Client, fork string, shas []st
 		}
 	}
 
+	// The fork's own refs/pull/* are invisible to GraphQL: a SHA no other ref holds
+	// is only clean once those are checked too (forkpulls.go).
+	var pending []string
+	for _, s := range shas {
+		if len(holders[s]) == 0 && unknown[s] == "" && prTotal > 0 {
+			pending = append(pending, s)
+		}
+	}
+	var pulls map[string]refVerdict
+	if len(pending) > 0 {
+		pulls = pullVerdicts(ctx, c, base, fork, pending, prTotal)
+	}
+
 	for _, s := range shas {
 		switch h := holders[s]; {
 		case len(h) > 0: // a proven holder stands even if other pages failed
@@ -160,8 +171,8 @@ func forkRefHolders(ctx context.Context, c *ghapi.Client, fork string, shas []st
 			out[s] = refVerdict{model.Confirmed, ev}
 		case unknown[s] != "":
 			out[s] = refVerdict{model.Unknown, unknown[s]}
-		case pullNote != "":
-			out[s] = refVerdict{model.Unknown, pullNote}
+		case pulls[s].Status != "":
+			out[s] = pulls[s]
 		default:
 			out[s] = refVerdict{model.NotFound, "no branch, tag or other ref in the fork contains it"}
 		}

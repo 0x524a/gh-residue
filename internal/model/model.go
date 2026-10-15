@@ -62,8 +62,10 @@ type Coverage struct {
 	// checked (truncated listing, forks of forks). Non-empty means incomplete.
 	ForksIncompleteReason string `json:"forks_incomplete_reason,omitempty"`
 	// Commits not requested per fork: covered through the first changed commits.
-	ForkCommitsSkipped int               `json:"fork_commits_skipped,omitempty"`
-	Surfaces           []SurfaceCoverage `json:"surfaces"`
+	ForkCommitsSkipped int `json:"fork_commits_skipped,omitempty"`
+	// Listed forks hidden by GitHub (repository and owner both 404); never counted as clean.
+	ForksHidden int               `json:"forks_hidden,omitempty"`
+	Surfaces    []SurfaceCoverage `json:"surfaces"`
 }
 
 type Inputs struct {

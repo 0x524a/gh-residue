@@ -19,7 +19,9 @@ type Result struct {
 	ForksIncompleteReason string
 	// Commits not individually checked on fork surfaces (covered via anchors).
 	ForkCommitsSkipped int
-	Failed             bool // the probe could not run at all
+	// Listed forks that GitHub hides (repository and owner both 404).
+	ForksHidden int
+	Failed      bool // the probe could not run at all
 }
 
 type Probe interface {

@@ -48,6 +48,9 @@ func Readiness(r *model.Run) (answer, why string) {
 		if r.Coverage.ForksIncompleteReason != "" {
 			return "unknown", "forks are not fully covered: " + r.Coverage.ForksIncompleteReason
 		}
+		if n := r.Coverage.ForksHidden; n > 0 {
+			return "unknown", fmt.Sprintf("%d listed forks are hidden by GitHub and cannot be checked; only GitHub Support can see them", n)
+		}
 		return "unknown", "ref-holding forks were not fully checked (run with --fork-refs, and check every fork)"
 	}
 	if r.Incomplete() {

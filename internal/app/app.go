@@ -41,6 +41,7 @@ func Verify(ctx context.Context, repo, source, version string, commits []model.O
 		run.Coverage.Surfaces = append(run.Coverage.Surfaces, res.Surfaces...)
 		run.Coverage.ForksTotal += res.ForksTotal
 		run.Coverage.ForksChecked += res.ForksChecked
+		run.Coverage.ForksHidden = max(run.Coverage.ForksHidden, res.ForksHidden)
 		if res.ForkCommitsSkipped > run.Coverage.ForkCommitsSkipped {
 			run.Coverage.ForkCommitsSkipped = res.ForkCommitsSkipped
 		}

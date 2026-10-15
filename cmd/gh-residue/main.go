@@ -26,7 +26,7 @@ import (
 // version is the release line; bump it with each tag. The commit is appended at
 // runtime from Go's VCS build info, so no -ldflags are needed (the extension
 // release action only takes plain go build options).
-const baseVersion = "0.2.0"
+const baseVersion = "0.2.1"
 
 var version = buildVersion(baseVersion)
 
@@ -150,20 +150,27 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	draftFirst, draftSrc, err := firstChangedCommits(*inPath, source, *firstChanged)
 	if err != nil {
-		fmt.Fprintln(stderr, "warning: first-changed-commits:", err, "(fork checks will cover every commit)")
+		fmt.Fprintln(stderr, "warning: first-changed-commits:", err)
 	}
 	// Every rewritten commit descends from a first changed commit, so a fork ref
-	// holding any of them holds one of these. Used only when all are in the input.
+	// holding any of them holds one of these. Only filter-repo's own file for this
+	// rewrite is trusted for that: a hand-typed --first-changed or a SHA list could
+	// leave commits that descend from no listed anchor, which would then go unchecked.
 	var anchors []string
 	forkScope := commits
-	if sub := anchorCommits(commits, draftFirst); sub != nil && len(sub) < len(commits) {
-		forkScope = sub
-		for _, c := range sub {
-			anchors = append(anchors, c.SHA)
+	if source == "filter-repo" {
+		fileFirst, ferr := input.LoadFirstChanged(*inPath)
+		if ferr != nil {
+			fmt.Fprintln(stderr, "warning: first-changed-commits:", ferr, "(fork checks will cover every commit)")
 		}
-		fmt.Fprintf(stderr, "note: forks are checked for the %d first changed commit(s) (%s), not all %d rewritten commits\n", len(sub), draftSrc, len(commits))
+		if sub := anchorCommits(commits, fileFirst); sub != nil && len(sub) < len(commits) {
+			forkScope = sub
+			for _, c := range sub {
+				anchors = append(anchors, c.SHA)
+			}
+			fmt.Fprintf(stderr, "note: forks are checked for the %d first changed commit(s) from filter-repo's file, not all %d rewritten commits\n", len(sub), len(commits))
+		}
 	}
-
 	est, needClone := estimate(repo, commits, forkScope, prevCheckpoint, *maxForks, !*noMirror, !*noForks, *forkRefs)
 	probes := []probe.Probe{probe.BaseObject{Client: client}}
 	if !*noMirror {

@@ -115,3 +115,85 @@ func TestForksAnchorNotInCommitsFallsBackToAll(t *testing.T) {
 		t.Fatalf("%d skipped, %d findings", res.ForkCommitsSkipped, len(res.Findings))
 	}
 }
+
+// A repository that is itself a fork has siblings and a parent that share its Git
+// data but are never listed, so an empty fork list must not read as full coverage.
+func TestForkOfAForkIsIncomplete(t *testing.T) {
+	c, done := apiClient(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/o/r":
+			fmt.Fprint(w, `{"forks_count":0,"fork":true,"parent":{"full_name":"up/r"},"source":{"full_name":"root/r"}}`)
+		case "/repos/o/r/forks":
+			fmt.Fprint(w, `[]`)
+		default:
+			w.WriteHeader(404)
+		}
+	})
+	defer done()
+	res := Forks{Client: c}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	if !strings.Contains(res.ForksIncompleteReason, "itself a fork of root/r") {
+		t.Fatalf("reason %q", res.ForksIncompleteReason)
+	}
+	for _, s := range res.Surfaces {
+		if s.Complete {
+			t.Fatalf("fork surfaces must not be complete: %+v", res.Surfaces)
+		}
+	}
+}
+
+// Listed forks whose repository and owner both 404 are hidden by GitHub: counted
+// and explained, but never clean.
+func TestHiddenForksAreCountedAndStayUnknown(t *testing.T) {
+	c, done := apiClient(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		switch {
+		case p == "/repos/o/r":
+			fmt.Fprint(w, `{"forks_count":3}`)
+		case p == "/repos/o/r/forks":
+			fmt.Fprint(w, `[{"full_name":"ok/r"},{"full_name":"gone/r"},{"full_name":"noaccess/r"}]`)
+		case p == "/users/gone":
+			w.WriteHeader(404)
+		case p == "/users/noaccess":
+			fmt.Fprint(w, `{"login":"noaccess"}`)
+		case strings.HasPrefix(p, "/repos/ok/"):
+			w.WriteHeader(422)
+			w.Write([]byte(`{"message":"No commit found for SHA"}`))
+		default:
+			w.WriteHeader(404)
+		}
+	})
+	defer done()
+	res := Forks{Client: c}.Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}})
+	if res.ForksHidden != 1 {
+		t.Fatalf("hidden %d, want 1 (the owner that still exists is only an access problem)", res.ForksHidden)
+	}
+	for _, f := range res.Findings {
+		if f.Status == model.NotFound && f.Location != "ok/r" {
+			t.Fatalf("an unreachable fork must never be not_found: %+v", f)
+		}
+		if f.Location == "gone/r" && (f.Status != model.Unknown || !strings.Contains(f.Evidence, "hidden")) {
+			t.Fatalf("%+v", f)
+		}
+	}
+	if res.Surfaces[0].Complete {
+		t.Fatal("hidden forks keep the surface incomplete")
+	}
+}
+
+// With no fork answering normally, a 404 may be a broken token, not hiding.
+func TestNothingIsHiddenWhenNoForkAnswers(t *testing.T) {
+	c, done := apiClient(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/o/r":
+			fmt.Fprint(w, `{"forks_count":1}`)
+		case "/repos/o/r/forks":
+			fmt.Fprint(w, `[{"full_name":"gone/r"}]`)
+		default:
+			w.WriteHeader(404)
+		}
+	})
+	defer done()
+	if res := (Forks{Client: c}).Run(context.Background(), "o/r", []model.OldCommit{{SHA: sha}}); res.ForksHidden != 0 {
+		t.Fatalf("hidden %d", res.ForksHidden)
+	}
+}

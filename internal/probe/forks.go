@@ -59,7 +59,7 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 
 	all := commits
 	commits = p.forkScope(commits)
-	total, err := p.forksCount(ctx, repo)
+	total, source, err := p.repoInfo(ctx, repo)
 	if err != nil {
 		return p.failed(commits, "fork count: "+err.Error())
 	}
@@ -67,7 +67,7 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 	if listErr != nil {
 		return p.failed(commits, "fork list: "+listErr.Error())
 	}
-	reason := incompleteReason(forks, listComplete, maxPages)
+	reason := incompleteReason(forks, listComplete, maxPages, source)
 	allForks := forks
 	sort.SliceStable(forks, func(i, j int) bool {
 		if forks[i].PushedAt != forks[j].PushedAt {
@@ -111,8 +111,9 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 	close(jobs)
 	wg.Wait()
 
+	hidden := p.markHidden(ctx, &res)
 	if p.Refs {
-		p.checkRefs(ctx, &res, forks, commits, conc)
+		p.checkRefs(ctx, &res, repo, forks, commits, conc)
 	}
 
 	// forks_count is a cached counter that undercounts (newren/git-filter-repo
@@ -122,6 +123,7 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 	res.ForksTotal, res.ForksChecked = max(total, listed), len(forks)
 	res.ForksIncompleteReason = reason
 	res.ForkCommitsSkipped = len(all) - len(commits)
+	res.ForksHidden = hidden
 	forksDone := res.ForksChecked >= res.ForksTotal && reason == ""
 	res.Surfaces = []model.SurfaceCoverage{{
 		Surface:  model.SurfaceForkObject,
@@ -136,10 +138,56 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 	return res
 }
 
+// markHidden finds listed forks that GitHub hides: the repository answers 404 for
+// every commit and its owner's account answers 404 too, while other forks answer
+// normally (so it is not a broken token). They stay Unknown: a 404 cannot be told
+// from missing access, and a hidden repository may still hold refs that only
+// GitHub Support can see. The count is reported so the reader can tell "hidden by
+// GitHub" from "failed to check".
+func (p Forks) markHidden(ctx context.Context, res *Result) int {
+	all404 := map[string]bool{}
+	reachable := false
+	for _, f := range res.Findings {
+		if f.Surface != model.SurfaceForkObject {
+			continue
+		}
+		if f.Status == model.Confirmed || f.Status == model.NotFound {
+			reachable = true
+		}
+		if _, seen := all404[f.Location]; !seen {
+			all404[f.Location] = true
+		}
+		if f.Status != model.Unknown || f.Evidence != "HTTP 404" {
+			all404[f.Location] = false
+		}
+	}
+	if !reachable {
+		return 0
+	}
+	hidden := map[string]bool{}
+	for fork, ok := range all404 {
+		if !ok {
+			continue
+		}
+		owner, _, _ := strings.Cut(fork, "/")
+		r, err := p.Client.Get(ctx, "/users/"+owner)
+		if err == nil && r.Status == 404 {
+			hidden[fork] = true
+		}
+	}
+	for i := range res.Findings {
+		f := &res.Findings[i]
+		if f.Surface == model.SurfaceForkObject && hidden[f.Location] {
+			f.Evidence = "HTTP 404; the fork and its owner account are hidden from the API"
+		}
+	}
+	return len(hidden)
+}
+
 // checkRefs adds one fork_ref finding per (fork, SHA). The object check decides:
 // a SHA the fork cannot resolve cannot be held by any of its refs (not_found); an
 // unknown object check stays unknown; only resolvable pairs cost a GraphQL query.
-func (p Forks) checkRefs(ctx context.Context, res *Result, forks []forkInfo, commits []model.OldCommit, conc int) {
+func (p Forks) checkRefs(ctx context.Context, res *Result, repo string, forks []forkInfo, commits []model.OldCommit, conc int) {
 	obj := map[string]map[string]model.Status{} // fork -> sha -> object status
 	for _, f := range res.Findings {
 		if f.Surface != model.SurfaceForkObject {
@@ -187,7 +235,7 @@ func (p Forks) checkRefs(ctx context.Context, res *Result, forks []forkInfo, com
 		go func() {
 			defer wg.Done()
 			for w := range jobs {
-				for sha, v := range forkRefHolders(ctx, p.Client, w.fork, w.resolved) {
+				for sha, v := range forkRefHolders(ctx, p.Client, repo, w.fork, w.resolved) {
 					add(finding(sha, model.SurfaceForkRef, w.fork, v.Status, v.Evidence))
 				}
 			}
@@ -223,21 +271,39 @@ func (p Forks) forkScope(commits []model.OldCommit) []model.OldCommit {
 	return out
 }
 
-func (p Forks) forksCount(ctx context.Context, repo string) (int, error) {
+// repoInfo returns the repository's cached fork count and, when the repository is
+// itself a fork, the full name of the network's source (else "").
+func (p Forks) repoInfo(ctx context.Context, repo string) (int, string, error) {
 	r, err := p.Client.Get(ctx, "/repos/"+repo)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	if r.Status != 200 {
-		return 0, fmt.Errorf("HTTP %d", r.Status)
+		return 0, "", fmt.Errorf("HTTP %d", r.Status)
 	}
 	var v struct {
-		ForksCount int `json:"forks_count"`
+		ForksCount int  `json:"forks_count"`
+		Fork       bool `json:"fork"`
+		Parent     *struct {
+			FullName string `json:"full_name"`
+		} `json:"parent"`
+		Source *struct {
+			FullName string `json:"full_name"`
+		} `json:"source"`
 	}
 	if err := json.Unmarshal(r.Body, &v); err != nil {
-		return 0, err
+		return 0, "", err
 	}
-	return v.ForksCount, nil
+	source := ""
+	switch {
+	case v.Source != nil:
+		source = v.Source.FullName
+	case v.Parent != nil:
+		source = v.Parent.FullName
+	case v.Fork:
+		source = "its parent repository"
+	}
+	return v.ForksCount, source, nil
 }
 
 // list returns the distinct forks GitHub lists, and whether the listing reached
@@ -272,8 +338,13 @@ func (p Forks) list(ctx context.Context, repo string, maxPages int) ([]forkInfo,
 }
 
 // incompleteReason says why the listed forks cannot be treated as every fork.
-func incompleteReason(forks []forkInfo, listComplete bool, maxPages int) string {
+func incompleteReason(forks []forkInfo, listComplete bool, maxPages int, source string) string {
 	var why []string
+	if source != "" {
+		// Only the repository's own forks are listed. The rest of its network (the
+		// source, its other forks) shares Git data with it but is never enumerated.
+		why = append(why, fmt.Sprintf("the repository is itself a fork of %s, and the rest of that network is not checked", source))
+	}
 	if !listComplete {
 		why = append(why, fmt.Sprintf("only the first %d forks GitHub lists were seen", maxPages*100))
 	}

@@ -78,3 +78,15 @@ func TestSupportDraft(t *testing.T) {
 		t.Error("missing first-changed must be called out")
 	}
 }
+
+func TestReadinessNamesHiddenForks(t *testing.T) {
+	r := &model.Run{
+		Coverage: model.Coverage{ForksHidden: 2, ForksTotal: 5, ForksChecked: 5,
+			Surfaces: []model.SurfaceCoverage{{Surface: model.SurfaceForkRef, Complete: false}}},
+		Findings: []model.Finding{{OldSHA: "a", Surface: model.SurfaceForkRef, Location: "x/y", Status: model.Unknown}},
+	}
+	ans, why := Readiness(r)
+	if ans != "unknown" || !strings.Contains(why, "2 listed forks are hidden by GitHub") {
+		t.Fatalf("%q %q", ans, why)
+	}
+}

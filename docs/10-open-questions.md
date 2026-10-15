@@ -6,6 +6,10 @@ Last updated 2026-10-12. Closed items are kept so the trail is visible. "Reviewe
 
 None. Items 9, 11, 12 and 19 were closed on 2026-10-15 by decision or by measurement; the notes below say which.
 
+## Review 2026-10-15 (independent Opus review of the fork checks)
+
+Applied in v0.2.1: a repo that is itself a fork is incomplete (it had been able to read `yes`); fork checks narrow only from filter-repo's own file, not from `--first-changed` (which could leave commits unchecked); a fork's pull refs are listed over REST and compared through the user's repo (verified live on `cli/go-gh` forks; the old `unknown` for any fork with pull requests is gone); listed forks that GitHub hides (repo and owner both 404, while other forks answer) are counted and explained, still unknown. Documented, not built: commits from an earlier filter-repo run are missing from the final `commit-map`; `--refs`-limited rewrites; grafts and replace refs. Not built: a GraphQL cross-check of nested-fork counts, because the review found the REST and GraphQL counters equal (97 for `cli/go-gh`), so it would add nothing; proving descent on GitHub for a hand-typed anchor list, so such a list simply does not narrow.
+
 ## Closed
 
 | # | Question | Resolution |
