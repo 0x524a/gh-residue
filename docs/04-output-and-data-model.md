@@ -6,7 +6,11 @@ All JSON carries `schema_version`.
 
 - `Run`: `schema_version`, `tool_version`, `repo`, `started_at`, `inputs` (source type, count), `coverage`, `findings[]`.
 - `Finding`: `old_sha`, `surface` (`base_object`, `branch` (any non-PR, non-tag ref, which Support's precondition cares about), `pr_ref`, `tag`, `fork_object`, `fork_ref`, `web_view`), `location` (ref name, PR number or fork full name), `status` (`confirmed` | `not_found` | `unknown`), `evidence` (one line: HTTP status or git result), `checked_at`.
-- `Coverage`: probes run/failed, forks total vs checked, `forks_incomplete_reason` (set when the fork listing was truncated or forks of forks exist; non-empty means fork coverage is incomplete), per-surface `complete` flag.
+- `Coverage`: probes run/failed, forks total vs checked, per-surface `complete` flag, and the fork-coverage fields (all optional, omitted when empty):
+  - `forks_incomplete_reason`: why the listed forks are not all forks (listing truncated, the repository is itself a fork, or a fork's own forks could not be listed). Non-empty means fork coverage is incomplete.
+  - `fork_commits_skipped`: commits not requested per fork because fork checks covered filter-repo's first changed commits only.
+  - `forks_hidden`, `hidden_forks`: listed forks GitHub hides (repository and owner both 404), by count and name. They stay `unknown`.
+  - `hidden_forks_accepted`, `forks_incomplete_reason_accepted`: set only with `--accept-hidden-forks`. They change the *Ready for Support?* line and nothing else; findings and the exit code still treat hidden forks as unknown.
 
 Only SHAs, ref names, repo names and PR numbers are stored. Never file contents, diffs or secrets. Output ordering is deterministic so two runs diff cleanly.
 

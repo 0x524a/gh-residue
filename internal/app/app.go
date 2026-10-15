@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/0x524a/gh-residue/internal/model"
@@ -16,6 +17,15 @@ import (
 // are carried over unchanged (keeping their checked_at) and only unknown or
 // missing checks are re-run. Unknown results are never carried.
 func Verify(ctx context.Context, repo, source, version string, commits []model.OldCommit, probes []probe.Probe, prev *model.Run) *model.Run {
+	return VerifyWithSave(ctx, repo, source, version, commits, probes, prev, nil)
+}
+
+// VerifyWithSave is Verify, and also calls save with a partial run after each
+// probe and every few dozen findings within one, so a checkpoint stays current
+// during a long run. Partial runs are incomplete by construction; only their
+// confirmed and not_found findings are ever carried over. save is never called
+// concurrently.
+func VerifyWithSave(ctx context.Context, repo, source, version string, commits []model.OldCommit, probes []probe.Probe, prev *model.Run, save func(*model.Run)) *model.Run {
 	run := &model.Run{
 		SchemaVersion: model.SchemaVersion,
 		ToolVersion:   version,
@@ -28,6 +38,23 @@ func Verify(ctx context.Context, repo, source, version string, commits []model.O
 	if prev != nil {
 		known = probe.NewKnown(prev.Findings, commits)
 	}
+	var mu sync.Mutex
+	snap := func(partial []model.Finding) {
+		if save == nil {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		part := *run
+		part.Findings = append(append([]model.Finding(nil), run.Findings...), partial...)
+		part.Coverage.Surfaces = append([]model.SurfaceCoverage{}, run.Coverage.Surfaces...)
+		if known != nil {
+			part.Findings, _ = merge(part.Findings, known.Findings())
+		}
+		part.Sort()
+		save(&part)
+	}
+	ctx = probe.WithSnapshot(ctx, snap)
 	for _, p := range probes {
 		if r, ok := p.(probe.Resumable); ok && known != nil {
 			p = r.WithKnown(known)
@@ -53,6 +80,7 @@ func Verify(ctx context.Context, repo, source, version string, commits []model.O
 		if res.ForksIncompleteReason != "" {
 			run.Coverage.ForksIncompleteReason = res.ForksIncompleteReason
 		}
+		snap(nil)
 	}
 	if known != nil {
 		run.Findings, run.Carried = merge(run.Findings, known.Findings())

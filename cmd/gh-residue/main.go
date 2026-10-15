@@ -203,7 +203,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	r := app.Verify(ctx, repo, source, version, commits, probes, prevCheckpoint)
+	var save func(*model.Run)
+	if *checkpoint != "" {
+		warned := false
+		save = func(part *model.Run) {
+			// Best effort: the final write below is the one that must succeed.
+			if err := writeCheckpoint(*checkpoint, part); err != nil && !warned {
+				warned = true
+				fmt.Fprintln(stderr, "warning: interim --checkpoint write failed:", err)
+			}
+		}
+	}
+	r := app.VerifyWithSave(ctx, repo, source, version, commits, probes, prevCheckpoint, save)
 	if *checkpoint != "" {
 		// Written before any output so a closed pipe can't lose it. Interrupted or
 		// rate-limited runs end in unknown results, which the next run re-checks.

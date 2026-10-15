@@ -2,8 +2,13 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/0x524a/gh-residue/internal/ghapi"
 	"github.com/0x524a/gh-residue/internal/model"
 	"github.com/0x524a/gh-residue/internal/probe"
 )
@@ -109,5 +114,53 @@ func TestNoPrevMeansNoResumeFields(t *testing.T) {
 	run := Verify(context.Background(), "o/r", "x", "t", nil, nil, nil)
 	if run.Carried != 0 || run.ResumedFrom != "" {
 		t.Fatalf("%+v", run)
+	}
+}
+
+func TestSaveKeepsACheckpointCurrentDuringAProbe(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	defer srv.Close()
+	c := ghapi.New("")
+	c.BaseURL = srv.URL
+	var commits []model.OldCommit
+	for i := 0; i < 120; i++ {
+		commits = append(commits, model.OldCommit{SHA: fmt.Sprintf("%040x", i+1)})
+	}
+	var sizes []int
+	var inSave bool
+	run := VerifyWithSave(context.Background(), "o/r", "sha-list", "t", commits,
+		[]probe.Probe{probe.BaseObject{Client: c}}, nil, func(part *model.Run) {
+			if inSave {
+				t.Error("save called concurrently")
+			}
+			inSave = true
+			sizes = append(sizes, len(part.Findings))
+			inSave = false
+		})
+	// 50 and 100 findings during the probe, then 120 when it finishes.
+	if len(sizes) != 3 || sizes[0] != 50 || sizes[1] != 100 || sizes[2] != 120 {
+		t.Fatalf("snapshots %v", sizes)
+	}
+	if len(run.Findings) != 120 {
+		t.Fatal(len(run.Findings))
+	}
+}
+
+// A partial run must keep results carried from the previous checkpoint, or the
+// interim write would erase them.
+func TestSaveKeepsCarriedResults(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	defer srv.Close()
+	c := ghapi.New("")
+	c.BaseURL = srv.URL
+	old := model.OldCommit{SHA: strings.Repeat("a", 40)}
+	prev := &model.Run{Repo: "o/r", Findings: []model.Finding{
+		{OldSHA: old.SHA, Surface: model.SurfaceBaseObject, Location: "o/r", Status: model.NotFound, CheckedAt: "2026-01-01T00:00:00Z"},
+	}}
+	var last *model.Run
+	VerifyWithSave(context.Background(), "o/r", "sha-list", "t", []model.OldCommit{old},
+		[]probe.Probe{probe.BaseObject{Client: c}}, prev, func(part *model.Run) { last = part })
+	if last == nil || len(last.Findings) != 1 || last.Findings[0].CheckedAt != "2026-01-01T00:00:00Z" {
+		t.Fatalf("carried result lost: %+v", last)
 	}
 }

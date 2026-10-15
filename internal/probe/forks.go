@@ -99,6 +99,7 @@ func (p Forks) Run(ctx context.Context, repo string, commits []model.OldCommit) 
 				f := finding(j.sha, model.SurfaceForkObject, j.fork, st, ev)
 				mu.Lock()
 				res.Findings = append(res.Findings, f)
+				snapshot(ctx, res.Findings)
 				mu.Unlock()
 			}
 		}()
@@ -231,7 +232,12 @@ func (p Forks) checkRefs(ctx context.Context, res *Result, repo string, forks []
 		resolved []string
 	}
 	var mu sync.Mutex
-	add := func(f model.Finding) { mu.Lock(); res.Findings = append(res.Findings, f); mu.Unlock() }
+	add := func(f model.Finding) {
+		mu.Lock()
+		res.Findings = append(res.Findings, f)
+		snapshot(ctx, res.Findings)
+		mu.Unlock()
+	}
 	var todo []work
 	for _, f := range forks {
 		w := work{fork: f.FullName}

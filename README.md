@@ -96,7 +96,7 @@ The Support draft's *Ready for Support?* line says `no` when a fork ref, branch 
 |---|---|
 | `--input PATH` | Rewritten clone or SHA list (required). |
 | `--json` | Print JSON instead of the table. Output order is stable, so runs diff cleanly. |
-| `--checkpoint FILE` | Resume from `FILE` if it exists, and write the result there. Refused for another repo or results older than `--checkpoint-max-age` (24h). |
+| `--checkpoint FILE` | Resume from `FILE` if it exists, and write the result there, also during the run (after each probe and every 50 findings), so a killed run keeps its progress. Refused for another repo or results older than `--checkpoint-max-age` (24h). |
 | `--against FILE` | Compare with an earlier `--json` run: `resolved`, `still-exposed`, `new`, `now-unknown`. |
 | `--support-draft FILE` | Write the Support request draft. Add `--first-changed SHA` and `--lfs-file NAME` from filter-repo's output. |
 | `--max-forks N`, `--no-forks` | Size of the fork sample, or skip forks. |

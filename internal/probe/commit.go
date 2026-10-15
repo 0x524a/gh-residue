@@ -49,6 +49,7 @@ func (p BaseObject) Run(ctx context.Context, repo string, commits []model.OldCom
 		}
 		st, ev := checkCommit(ctx, p.Client, repo, c.SHA)
 		res.Findings = append(res.Findings, finding(c.SHA, model.SurfaceBaseObject, repo, st, ev))
+		snapshot(ctx, res.Findings)
 	}
 	res.Surfaces = []model.SurfaceCoverage{{
 		Surface: model.SurfaceBaseObject, Complete: complete(res.Findings, model.SurfaceBaseObject),
