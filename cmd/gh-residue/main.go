@@ -26,7 +26,7 @@ import (
 // version is the release line; bump it with each tag. The commit is appended at
 // runtime from Go's VCS build info, so no -ldflags are needed (the extension
 // release action only takes plain go build options).
-const baseVersion = "0.3.0"
+const baseVersion = "0.3.1"
 
 var version = buildVersion(baseVersion)
 
