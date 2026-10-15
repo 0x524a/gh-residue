@@ -122,7 +122,7 @@ Reports, checkpoints and drafts list the SHAs of a leak. Do not commit them to a
 - Local clones, CI caches and third-party mirrors are out of reach. Public repositories' push events may also sit in archives such as GH Archive; in a sample it kept only a few of them, so its absence proves nothing, and neither it nor this tool can remove anything from it.
 - The cached web view of a commit is not probed yet.
 - CI runs the tests and a release-style build on Linux, macOS and Windows. One Windows gap remains: passing a token to git for the mirror clone goes through a `sh` helper that CI cannot exercise, because it needs an authenticated remote. On Windows, file permissions are not enforced either, so checkpoint and draft files are not restricted to your user.
-- 5 questions are still open in [`docs/10-open-questions.md`](docs/10-open-questions.md).
+- 4 questions are still open in [`docs/10-open-questions.md`](docs/10-open-questions.md).
 
 ## Design
 
