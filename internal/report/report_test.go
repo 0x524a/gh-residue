@@ -117,3 +117,15 @@ func TestTableDisclosesForkAnchorScope(t *testing.T) {
 		t.Fatalf("scope not disclosed:\n%s", b.String())
 	}
 }
+
+func TestTableDoesNotSayZeroOfZeroForks(t *testing.T) {
+	r := sample()
+	r.Coverage.ForksTotal, r.Coverage.ForksChecked = 0, 0
+	r.Coverage.ForksIncompleteReason = "the repository is itself a fork of up/r, and the rest of that network is not checked"
+	var b bytes.Buffer
+	Table(&b, r)
+	out := b.String()
+	if strings.Contains(out, "0 of 0") || !strings.Contains(out, "has no forks of its own") || !strings.Contains(out, "itself a fork of up/r") {
+		t.Fatalf("\n%s", out)
+	}
+}

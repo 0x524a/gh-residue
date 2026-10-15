@@ -67,8 +67,12 @@ func Table(w io.Writer, r *model.Run) {
 		if hasSurface(r, model.SurfaceForkRef) {
 			what = "object-resolvable and ref-holding"
 		}
-		fmt.Fprintf(w, "Fork coverage: checked %d of %d forks (%s).\n",
-			r.Coverage.ForksChecked, r.Coverage.ForksTotal, what)
+		if r.Coverage.ForksTotal == 0 {
+			fmt.Fprintf(w, "Fork coverage: the repository has no forks of its own (%s).\n", what)
+		} else {
+			fmt.Fprintf(w, "Fork coverage: checked %d of %d forks (%s).\n",
+				r.Coverage.ForksChecked, r.Coverage.ForksTotal, what)
+		}
 		if r.Coverage.ForksIncompleteReason != "" {
 			fmt.Fprintf(w, "Fork coverage is incomplete: %s.\n", r.Coverage.ForksIncompleteReason)
 		}
