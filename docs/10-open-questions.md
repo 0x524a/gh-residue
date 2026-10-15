@@ -4,17 +4,16 @@ Last updated 2026-10-12. Closed items are kept so the trail is visible. "Reviewe
 
 ## Open
 
-| # | Claim or question | Where | How to close |
-|---|---|---|---|
-| 9 | Do commercial products already cover post-rewrite verification? Positioning only: no design decision depends on the answer | doc 01 | Survey beyond GitHub repo search, if wanted for the README |
-| 11 | What request budget is right? Forks are now checked for the first changed commits only (about one request per fork, not forks x commits), so the budget no longer scales with the size of the rewrite. Checked on a two-leak rewrite: all 6 changed commits had an anchor ancestor, 2 anchors. Not yet run on a large real repository. What remains: The real coverage limits are the hard cap of 1000 listed forks and forks of forks (both now reported as incomplete coverage), not the 200-fork sample size | doc 05 | Use the tool on a few large repos and tune the default sample and the page cap |
-| 12 | Formal trademark clearance for the name | doc 07 | Separate legal step, if desired |
-| 19 | Does the shared Git data between forks also hold for forks of private repositories and for detached forks? Verified only for public networks | doc 03 | Needs private repositories in two accounts, or a detached fork |
+None. Items 9, 11, 12 and 19 were closed on 2026-10-15 by decision or by measurement; the notes below say which.
 
 ## Closed
 
 | # | Question | Resolution |
 |---|---|---|
+| 9 | ~~Do commercial products already cover post-rewrite verification?~~ | **Closed 2026-10-15, not pursued.** Positioning only: no design decision depends on the answer. Reopen if a README comparison is wanted |
+| 11 | ~~What request budget is right?~~ | **Closed 2026-10-15, measured.** `cli/go-gh` (118 listed forks, `--fork-refs`, one SHA, no mirror): 136 REST requests, 3 GraphQL queries, 85 s at concurrency 1. Fork checks now cost about one request per fork and anchor, so the budget no longer scales with the rewrite. `0x524a/gortsplib` has no forks, so it exercised only the non-fork path (2 requests). Finding: a large public repo will usually stay `unknown`, never `yes`. In that run 25 listed forks answered 404 on the repository itself (deleted, suspended or spam accounts) and 9 forks have pull requests, whose refs are invisible. Both are treated as unknown by design (a 404 cannot be told from missing access). Left as is: reading 404 as "gone" would break ADR-0002 |
+| 12 | ~~Formal trademark clearance for the name~~ | **Closed 2026-10-15 by the owner: no trademark.** |
+| 19 | ~~Do shared Git data between forks hold for private and detached forks?~~ | **Closed 2026-10-15, accepted and mitigated.** Not verified: it needs private repos in two accounts, or a detached fork. The tool does not depend on it: the per-fork REST object check still runs for the first changed commits, so a fork that cannot resolve the commit is `not_found` and one that errors is `unknown` |
 | 13 | ~~How long does `refs/pull/N/merge` keep the old commit after a PR-branch force-push?~~ | **Closed 2026-10-15, verified (one experiment).** In a throwaway public repo, two PRs were force-pushed to new commits (PR 2 closed right after). Polled every minute for 100 minutes, then once about 70 hours later: both `merge` refs, open and closed, still contained the old commit; both `head` refs dropped it at once. So a merge ref does not expire on its own. This contradicts the earlier review's 19 of 19 open PRs losing it within about 15 hours; the likely difference (untested) is that those PRs' base branches moved, which makes GitHub recompute the merge ref. Here the base never moved. Consequence: a PR merge ref is a durable exposure only Support can clear, as the design assumes. Repo deleted afterwards |
 | 1 | ~~Exact fields GitHub Support requires~~ | **Closed 2026-10-10.** Repo name; affected-PR count; First Changed Commit(s) from filter-repo; LFS orphan note and file. Also a documented precondition: no non-PR references and no forks holding references. See doc 04 |
 | 2 | ~~Authenticated REST rate limit and secondary limits~~ | **Closed 2026-10-10.** 5,000/hour personal; 1,000/hour `GITHUB_TOKEN`; secondary limits documented. See doc 05 |
